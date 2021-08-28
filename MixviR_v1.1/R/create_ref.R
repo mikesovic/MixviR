@@ -64,6 +64,7 @@ create_ref <- function(genome, feature.bed) {
   feature_positions <- feature_positions %>%
     dplyr::group_by(feature) %>%
     dplyr::mutate("gene_aa_position" = rep(1:(dplyr::n()/3), each = 3)) %>%
+    dplyr::ungroup() %>%
     dplyr::mutate("ref_AA" = aas)
 
   nonfeature_positions <- merged %>%
