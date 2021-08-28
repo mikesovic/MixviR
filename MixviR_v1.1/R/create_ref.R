@@ -75,7 +75,7 @@ create_ref <- function(genome, feature.bed) {
 
   all_ref <- dplyr::bind_rows(nonfeature_positions,
                        feature_positions) %>%
-    dplyr::arrange(genomic_pos)
+    dplyr::arrange(pos)
 
   all_ref$feature[which(is.na(all_ref$feature))] <- "non-genic"
 
@@ -91,6 +91,7 @@ create_ref <- function(genome, feature.bed) {
     dplyr::rename("gene" = "feature")
 
   all_ref <- all_ref %>%
+    dplyr::rename("genomic_pos" = "pos") %>%
     dplyr::select(genomic_pos,
                  ref_base,
                  gene,
