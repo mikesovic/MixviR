@@ -14,7 +14,7 @@ create_ref <- function(genome, feature.bed) {
   names(features) <- c("chrm", "start", "end", "feature")
 
   features <- features %>%
-    dplyr::group_by(r=row_number()) %>%
+    dplyr::group_by(r=dplyr::row_number()) %>%
     dplyr::mutate("pos" = list(seq.int(from = start, to = end))) %>%
     dplyr::ungroup() %>%
     dplyr::select(-r) %>%
