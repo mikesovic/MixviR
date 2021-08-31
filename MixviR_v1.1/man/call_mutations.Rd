@@ -8,7 +8,7 @@ call_mutations(
   sample.dir,
   min.alt.freq = 0.01,
   name.sep = "NULL",
-  reference = "https://raw.githubusercontent.com/mikesovic/IDI-AMSL/main/SC2_ref.tsv",
+  reference = "Wuhan",
   write.mut.table = FALSE
 )
 }
@@ -22,11 +22,15 @@ POS = genomic position, REF = reference base, ALT = alternate base/allele, AF = 
 
 \item{name.sep}{Character in sample names that separates the unique sample identifier (characters preceeding the separator) from any additional text. Only text preceeding the first instance of the character will be retained.}
 
-\item{reference}{Reference genome information in MixVir format.}
+\item{reference}{MixviR ref object. "Wuhan" uses pre-generated Sars-Cov2 ref genome. Otherwise, must provide arguments fasta.genome and bed to generate ref genome object on the fly.}
 
 \item{write.mut.table}{Logical to indicated whether to write a text file that stores all mutations
 for all samples analyzed to working directory. This is the same information contained in data frame
 'samp_mutations' created by this function. Default = FALSE}
+
+\item{fasta.genome}{fasta formatted genome file (assumes only one chromosome)}
+
+\item{bed}{bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) with info on features of interest (open reading frames to translate)}
 }
 \value{
 Data frame 'samp_mutations' containing amino acid changes observed for each sample.
