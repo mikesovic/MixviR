@@ -69,7 +69,7 @@ id_snps <- function(variant.calls, ref) {
 
   #translate codons
   codons <- Biostrings::DNAStringSet(features_w_codons$samp_codon)
-  aas <- Biostrings::translate(codons) %>% as.character(use.names = FALSE)
+  aas <- Biostrings::translate(codons, no.init.codon = TRUE) %>% as.character(use.names = FALSE)
   features_w_codons$samp_AA <- aas
   features_w_codons <- features_w_codons %>%
     dplyr::mutate("samp_identity" = paste0(gene,
