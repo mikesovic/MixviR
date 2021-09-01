@@ -291,7 +291,7 @@ id_indels <- function(variant.calls, ref) {
 call_mutations <- function(sample.dir,
                            min.alt.freq = 0.01, ###need to apply a filter before we call mutations. Otherwise, lots of noise gets included in calls and can affect real calls.
                            name.sep = "NULL",
-                           reference = ,
+                           reference = "Wuhan",
                            write.mut.table = FALSE) {
 
   samp_files <- dir(sample.dir)
