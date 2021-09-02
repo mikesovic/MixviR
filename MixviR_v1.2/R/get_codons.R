@@ -10,7 +10,7 @@
 get_codons <- function(gene.seq) {
   CodonStartPositions <- 0:(length(gene.seq)/3-1) * 3 + 1
   CodonEndPositions <- 1:(length(gene.seq)/3) * 3
-  #this function will be applied to the ALT column
+  #this function will be applied to the ALT column when run from call_mutations()
   #entries in this column will have length > 1 in the case of insertions
   #insertions will be dealt with separately, so here, trim those to the first nucleotide
   first_base <- stringr::str_sub(gene.seq, start = 1L, end = 1L)

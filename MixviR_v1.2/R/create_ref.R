@@ -11,94 +11,98 @@
 create_ref <- function(genome, feature.bed) {
 
   features <- readr::read_tsv(feature.bed, col_names = FALSE)
-  names(features) <- c("chrm", "start", "end", "feature")
+  names(features) <- c("chrm", "start", "end", "GENE")
 
+  #create df that includes row for every position in each feature/gene
   features <- features %>%
     dplyr::group_by(r=dplyr::row_number()) %>%
-    dplyr::mutate("pos" = list(seq.int(from = start, to = end))) %>%
+    dplyr::mutate("POS" = list(seq.int(from = start, to = end))) %>%
     dplyr::ungroup() %>%
     dplyr::select(-r) %>%
-    tidyr::unnest(cols = c(pos))
+    tidyr::unnest(cols = c(POS))
 
-
+  #read in the genome
   sequence <- Biostrings::readDNAStringSet(genome)
 
-  ref_genome <- data.frame("chr" = character(),
-                           "pos" = integer(),
-                           "ref_base" = character()
+  ref_genome <- data.frame("CHR" = character(),
+                           "POS" = integer(),
+                           "REF_BASE" = character()
                            )
 
-  for (i in length(sequence)) {
+  for (i in length(sequence)) { #loop over each chromosome in the genome
     chr_seq <- as.character(sequence[[i]]) %>%
       stringr::str_split(pattern = "") %>%
       unlist()
-    chr_seq <- data.frame("chr" = names(sequence)[i],
-                          "pos" = 1:length(sequence[[i]]),
-                          "ref_base" = chr_seq)
+    chr_seq <- data.frame("CHR" = names(sequence)[i],
+                          "POS" = 1:length(sequence[[i]]),
+                          "REF_BASE" = chr_seq)
     ref_genome <- dplyr::bind_rows(ref_genome, chr_seq)
   }
 
+  #to analyzed multiple chromosomes, need to merge on CHR+POS
+  #right now, only merging on POS, so assumes one chr only
   merged <- dplyr::left_join(x = ref_genome,
                              y = features,
-                             by = "pos") %>%
-    dplyr::select(-chrm)
+                             by = "POS") %>%
+    dplyr::select(-chrm, -start, -end)
 
-  feature_positions <- merged %>% dplyr::filter(!is.na(feature))
+  feature_positions <- merged %>% dplyr::filter(!is.na(GENE))
 
-  split_to_codons <- function(x) {
-    StartVec <- 0:(length(x)/3-1) * 3 + 1
-    EndVec <- 1:(length(x)/3) * 3
-    gene_seq <- x %>% unlist %>% paste0(collapse = "")
-    codons <- stringr::str_sub(string = gene_seq, start = StartVec, end = EndVec)
-    rep(codons, each = 3)
-  }
+  # split_to_codons <- function(x) {
+  #   StartVec <- 0:(length(x)/3-1) * 3 + 1
+  #   EndVec <- 1:(length(x)/3) * 3
+  #   gene_seq <- x %>% unlist %>% paste0(collapse = "")
+  #   codons <- stringr::str_sub(string = gene_seq, start = StartVec, end = EndVec)
+  #   rep(codons, each = 3)
+  # }
 
   feature_positions <- feature_positions %>%
-    dplyr::group_by(feature) %>%
-    dplyr::mutate("ref_codon" = split_to_codons(ref_base))
+    dplyr::group_by(GENE) %>%
+    dplyr::mutate("REF_CODON" = get_codons(REF_BASE))
 
-  codons <- Biostrings::DNAStringSet(feature_positions$ref_codon)
+  codons <- Biostrings::DNAStringSet(feature_positions$REF_CODON)
   aas <- Biostrings::translate(codons, no.init.codon = TRUE)
   aas <- as.character(aas, use.names = FALSE)
 
   feature_positions <- feature_positions %>%
-    dplyr::group_by(feature) %>%
-    dplyr::mutate("gene_aa_position" = rep(1:(dplyr::n()/3), each = 3)) %>%
+    dplyr::group_by(GENE) %>%
+    dplyr::mutate("GENE_AA_POS" = rep(1:(dplyr::n()/3), each = 3)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate("ref_AA" = aas)
+    dplyr::mutate("REF_AA" = aas)
 
   nonfeature_positions <- merged %>%
-    dplyr::filter(is.na(feature)) %>%
-    dplyr::mutate("ref_codon" = NA) %>%
-    dplyr::mutate("ref_AA" = NA) %>%
-    dplyr::mutate("gene_aa_position" = NA)
+    dplyr::filter(is.na(GENE)) %>%
+    dplyr::mutate("REF_CODON" = NA) %>%
+    dplyr::mutate("REF_AA" = NA) %>%
+    dplyr::mutate("GENE_AA_POS" = NA)
 
   all_ref <- dplyr::bind_rows(nonfeature_positions,
                        feature_positions) %>%
-    dplyr::arrange(pos)
+    dplyr::arrange(POS)
 
-  all_ref$feature[which(is.na(all_ref$feature))] <- "non-genic"
+  all_ref$GENE[which(is.na(all_ref$GENE))] <- "non-genic"
 
   all_ref <- all_ref %>% tidyr::unite(col = "ref1",
-                                      feature, ref_AA,
+                                      GENE, REF_AA,
                                       sep = "_",
                                       remove = FALSE) %>%
-    tidyr::unite(col = "ref_identity",
-          ref1, gene_aa_position,
+    tidyr::unite(col = "REF_IDENT",
+          ref1, GENE_AA_POS,
           sep = "",
           remove = FALSE) %>%
     dplyr::select(-ref1) %>%
-    dplyr::rename("gene" = "feature")
+    dplyr::mutate("REF_IDENT" = stringr::str_replace_all(REF_IDENT, 
+                                                         "non-genic_NANA", 
+                                                         "non-genic"))
 
   all_ref <- all_ref %>%
-    dplyr::rename("genomic_pos" = "pos") %>%
-    dplyr::select(genomic_pos,
-                 ref_base,
-                 gene,
-                 ref_codon,
-                 ref_AA,
-                 gene_aa_position,
-                 ref_identity
+    dplyr::select(POS,
+                 REF_BASE,
+                 GENE,
+                 REF_CODON,
+                 REF_AA,
+                 GENE_AA_POS,
+                 REF_IDENT
     )
 
   all_ref
