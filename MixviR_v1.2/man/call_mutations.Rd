@@ -9,7 +9,9 @@ call_mutations(
   min.alt.freq = 0.01,
   name.sep = "NULL",
   reference = "Wuhan",
-  write.mut.table = FALSE
+  write.mut.table = FALSE,
+  fasta.genome,
+  bed
 )
 }
 \arguments{

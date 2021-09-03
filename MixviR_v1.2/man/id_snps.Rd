@@ -12,7 +12,7 @@ id_snps(variant.calls, ref)
 \item{ref}{reference genome in "MixVir" format (genomic positions repeated for each associated feature they're associated with, etc.)}
 }
 \value{
-Data frame with cols "genomic_pos", "ref_base", "gene", "ref_codon", "ref_AA", "gene_aa_position", "ref_identity", "REF", "ALT", "ALT_freq", "ALT_COUNT", "samp_codon", "samp_AA", "samp_identity", "DP"
+Data frame with cols "POS", "REF_BASE", "GENE", "REF_CODON", "REF_AA", "GENE_AA_POS", "REF_IDENT", "REF", "ALT", "ALT_freq", "ALT_COUNT", "samp_codon", "samp_AA", "samp_identity", "DP"
 }
 \description{
 Identify amino acid changes associated with single nucleotide variation. Changes associated with indels are identified in separate function. Used by call_mutations function.

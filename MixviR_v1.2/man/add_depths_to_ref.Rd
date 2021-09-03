@@ -14,7 +14,7 @@ add_depths_to_ref(ref, samp, samp.dir)
 \item{samp.dir}{Directory storing sample file defined with parameter 'samp'.}
 }
 \value{
-Data frame with cols "genomic_pos"	"ref_base"	"gene"	"ref_codon"	"ref_AA	gene_aa_position"	"ref_identity" "DP"
+Data frame with cols "genomic_pos"	"ref_base"	"gene"	"ref_codon"	"ref_AA	GENE_AA_POS"	"ref_identity" "DP"
 }
 \description{
 Add column for total read depths for a given sample to reference df
