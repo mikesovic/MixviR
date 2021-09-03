@@ -102,8 +102,8 @@ create_ref <- function(genome, feature.bed) {
                  REF_CODON,
                  REF_AA,
                  GENE_AA_POS,
-                 REF_IDENT
-    )
+                 REF_IDENT) %>%
+    dplyr::mutate("REF_BASE" = as.character(REF_BASE))
 
   all_ref
 }
