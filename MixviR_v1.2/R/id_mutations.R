@@ -272,7 +272,7 @@ id_indels <- function(variant.calls, ref) {
 #' for all samples analyzed to working directory. This is the same information contained in data frame
 #' 'samp_mutations' created by this function. Default = FALSE
 #' @param fasta.genome fasta formatted genome file (assumes only one chromosome)
-#' @param bed bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) with info on features of interest (open reading frames to translate)
+#' @param bed bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) defining features of interest (open reading frames to translate)
 #' @keywords mutation
 #' @return Data frame 'samp_mutations' containing amino acid changes observed for each sample.
 #' @export

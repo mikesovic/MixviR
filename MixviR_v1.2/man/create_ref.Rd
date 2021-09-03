@@ -9,7 +9,7 @@ create_ref(genome, feature.bed)
 \arguments{
 \item{genome}{fasta formatted genome file (assumes only one chromosome)}
 
-\item{feature.bed}{bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) with info on features of interest (open reading frames to translate)}
+\item{feature.bed}{bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) defining features of interest (open reading frames to translate)}
 }
 \description{
 Uses a fasta genome (single chromosome) and bed file defining features of interest (genes) to create a data frame used as a reference to call variants/mutations from a sample.

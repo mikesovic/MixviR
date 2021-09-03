@@ -2,7 +2,7 @@
 #'
 #' Uses a fasta genome (single chromosome) and bed file defining features of interest (genes) to create a data frame used as a reference to call variants/mutations from a sample.
 #' @param genome fasta formatted genome file (assumes only one chromosome)
-#' @param feature.bed bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) with info on features of interest (open reading frames to translate)
+#' @param feature.bed bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) defining features of interest (open reading frames to translate)
 #' @keywords reference
 #' @export
 #' @examples

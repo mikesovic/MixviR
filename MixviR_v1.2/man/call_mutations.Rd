@@ -32,7 +32,7 @@ for all samples analyzed to working directory. This is the same information cont
 
 \item{fasta.genome}{fasta formatted genome file (assumes only one chromosome)}
 
-\item{bed}{bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) with info on features of interest (open reading frames to translate)}
+\item{bed}{bed file (4 columns, tab delimited, no column names: chr, start, end, feature_name) defining features of interest (open reading frames to translate)}
 }
 \value{
 Data frame 'samp_mutations' containing amino acid changes observed for each sample.
