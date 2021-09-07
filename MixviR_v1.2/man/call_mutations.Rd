@@ -16,7 +16,7 @@ call_mutations(
 }
 \arguments{
 \item{sample.dir}{Path to directory with one tab-delimited file for each sample to analyze.
-Each file should contain columns named POS, REF, ALT, AF, DP and is generally
+Each file should contain columns named POS, REF, ALT, DP, ALT_COUNT and is generally
 a summary from a vcf file. Additional columns can be included and will be ignored.
 POS = genomic position, REF = reference base, ALT = alternate base/allele, AF = alt frequency, DP = read depth at site}
 
