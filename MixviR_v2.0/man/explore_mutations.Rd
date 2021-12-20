@@ -7,15 +7,15 @@
 explore_mutations(dates = NULL, lineage.muts = NULL)
 }
 \arguments{
-\item{dates}{path to csv file with cols "SAMP_NAME" and "date". Sample names need to match those in samp_mutations data frame created by call_mutations().}
+\item{dates}{path to optional csv file with cols "SAMP_NAME", "LOCATION", and "DATE". Sample names need to match those in \emph{samp_mutations} data frame created by \code{call_mutations()}. Dates should be provided in the format \emph{mmddyyyy}.}
 
-\item{lineage.muts}{path to csv file with cols "Gene", "ALT_ID", "Lineage" containing mutations associated with lineages of interest. See example file at "https://github.com/mikesovic/MixviR/blob/main/mutation_files/outbreak_20211202.csv". Can use this example file by setting lineage.muts to "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20211202.csv"}
+\item{lineage.muts}{path to optional csv file with cols "Gene", "Mutation", and  "Lineage" containing mutations associated with lineages of interest. See example file at "https://github.com/mikesovic/MixviR/blob/main/mutation_files/outbreak_20211202.csv". Can use this example file by setting lineage.muts to "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20211202.csv"}
 }
 \value{
 Shiny Dashboard to Explore Data
 }
 \description{
-Open Dashboard To Explore Mutation Data
+Open Dashboard To Explore Mutation Data Stored In \emph{samp_mutations} Data Frame Created With \code{call_mutations()}.
 }
 \examples{
 explore_mutations()

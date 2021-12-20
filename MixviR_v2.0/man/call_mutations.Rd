@@ -2,11 +2,11 @@
 % Please edit documentation in R/id_mutations.R
 \name{call_mutations}
 \alias{call_mutations}
-\title{Identify Sample Amino Acid Changes}
+\title{Identify Amino Acid Changes From A Potentially Mixed Sample}
 \usage{
 call_mutations(
   sample.dir = NULL,
-  csv.infiles = TRUE,
+  csv.infiles = FALSE,
   min.alt.freq = 0.01,
   name.sep = NULL,
   reference = "custom",
@@ -18,25 +18,25 @@ call_mutations(
 \arguments{
 \item{sample.dir}{Path to directory containing vcf or csv files for each sample to analyze. VCF's need to contain "DP" and "AD" flags in the FORMAT field. Should not contain any other files.}
 
-\item{min.alt.freq}{Minimum frequency (0-1) for retaining alternate allele. Default = 0.01.}
+\item{min.alt.freq}{Minimum frequency (0-1) for retaining alternate allele. Default = 0.01. Extremely low values (i.e. zero) are not recommended here - see vignette for details.}
 
 \item{name.sep}{Character in input file names that separates the unique sample identifier (characters preceeding the separator) from any additional text. Only text preceeding the first instance of the character will be retained and used as the sample name.}
 
-\item{reference}{MixviR ref object (created with create_ref()). "Wuhan" uses pre-generated Sars-Cov2 ref genome. Otherwise, must provide arguments fasta.genome and bed to generate ref genome object on the fly.}
+\item{reference}{MixviR ref object (created with `create_ref()``). "Wuhan" uses pre-generated Sars-Cov2 ref genome. Otherwise, must provide arguments \emph{fasta.genome} and \emph{bed} to generate ref genome object on the fly.}
 
-\item{write.mut.table}{Logical to indicated whether to write a text file that stores all mutations for all samples analyzed to working directory. This is the same information contained in data frame 'samp_mutations' created by this function. Default = FALSE.}
+\item{write.mut.table}{Logical indicating whether to write the 'samp_mutations' data frame (see "Value" below) to a text file in the current working directory. Default = FALSE.}
 
 \item{fasta.genome}{fasta formatted reference genome file.}
 
 \item{bed}{bed file defining features of interest (open reading frames to translate). Should be tab delimited and have 4 columns (no column names): chr, start, end, feature_name}
 
-\item{csv.input}{Logical to indicate whether files in sample.dir directory are in vcf or csv format. All files must be of the same format. If csv, they must contain the columns: "CHR"    "POS"    "REF"    "ALT"    "DP"    "ALT_COUNT". See the batch_vcf_to_mixvir() function to convert vcfs to csv format (csv may be slightly faster for running call_mutations()).}
+\item{csv.input}{Logical to indicate whether files in \emph{sample.dir} directory are in vcf or csv format. All files must be of the same format. If csv, they must contain columns named: "CHR"    "POS"    "REF"    "ALT"    "DP"    "ALT_COUNT". See the `batch_vcf_to_mixvir()`` function to convert vcfs to csv format (csv may be slightly faster for running call_mutations()). Default is FALSE (input is in vcf format).}
 }
 \value{
-Data frame 'samp_mutations' containing amino acid changes observed for each sample.
+Object 'samp_mutations' stored in the global environment. Specifically, a data frame containing amino acid changes observed for each sample, positions of the underlying mutations, and other information.
 }
 \description{
-Function to identify full set of amino acid changes in a given sample (includes changes based on both SNVs and indels)
+Identify full set of amino acid changes from one or more samples (includes changes based on both SNVs and indels)
 }
 \examples{
 call_mutations()
