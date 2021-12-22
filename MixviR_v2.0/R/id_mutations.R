@@ -568,7 +568,7 @@ call_mutations <- function(sample.dir = NULL,
   all_variants <- all_variants %>%
     dplyr::select(-REF_IDENT, -samp_identity) %>%
     dplyr::arrange(samp_name, CHR, POS)
-
+   
   #create samp_mutations df and write it out - this is the final output
   samp_mutations <- all_variants %>%
     dplyr::select(samp_name, CHR, POS, GENE, ALT_ID, AF, ALT_COUNT, DP) %>%
@@ -581,7 +581,7 @@ call_mutations <- function(sample.dir = NULL,
 
   if (write.all.targets == "TRUE") {
     
-    #read in the file that associated genomic positions with mutations of interest and lineage
+    #read in the file that associates genomic positions with mutations of interest and lineage
     target_mutations <- readr::read_csv(lineage.muts, show_col_types = FALSE) %>% 
       dplyr::select(-Lineage) %>%
       tidyr::unite("ALT_ID",
@@ -617,9 +617,9 @@ call_mutations <- function(sample.dir = NULL,
       #get depths for positions associated with each mutation of interest not observed in the current sample
       if (csv.infiles == FALSE) {
         #file is currently a vcf - need to get it in to "MixviR/csv format"
-        variants_df <- vcf_to_mixvir(infile = paste0(sample.dir, "/", file))
+        variants_df <- vcf_to_mixvir(infile = paste0(sample.dir, "/", curr_file))
       } else{
-        variants_df <- readr::read_csv(file = paste0(sample.dir, "/", file), show_col_types = FALSE)
+        variants_df <- readr::read_csv(file = paste0(sample.dir, "/", curr_file), show_col_types = FALSE)
       }
       
       ref_w_depth <- add_depths_to_ref(ref = ref_df,
@@ -654,7 +654,9 @@ call_mutations <- function(sample.dir = NULL,
       
     }
     
-    samp_mutations <- all_variants
+    samp_mutations <- all_variants %>%
+      dplyr::mutate("AF" = tidyr::replace_na(AF, 0),
+                    "DP" = tidyr::replace_na(DP, 0))
   }
   
   
