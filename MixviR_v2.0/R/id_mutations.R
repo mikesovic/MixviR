@@ -630,10 +630,7 @@ call_mutations <- function(sample.dir = NULL,
         tidyr::unite("Chr_pos",
                      CHR, POS,
                      sep = ";;;;")
-        
-      depths <<- depths
-      not_in_samp <<- not_in_samp
-      
+
       not_in_samp <- dplyr::left_join(x = not_in_samp,
                                       y = depths,
                                       by = "Chr_pos")
