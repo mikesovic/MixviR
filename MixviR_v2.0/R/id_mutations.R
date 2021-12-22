@@ -453,7 +453,7 @@ call_mutations <- function(sample.dir = NULL,
       #file is currently a vcf - need to get it in to "MixviR/csv format"
       variants_df <- vcf_to_mixvir(infile = paste0(sample.dir, "/", file))
     } else{
-      variants_df <- readr::read_csv(file = paste0(sample.dir, "/", file, show_col_types = FALSE))
+      variants_df <- readr::read_csv(file = paste0(sample.dir, "/", file), show_col_types = FALSE)
     }
     
     #add coverages at each position for the current sample to the ref object/data frame
@@ -582,7 +582,7 @@ call_mutations <- function(sample.dir = NULL,
   if (write.all.targets == "TRUE") {
     
     #read in the file that associated genomic positions with mutations of interest and lineage
-    target_mutations <- readr::read_csv(lineage.muts) %>% 
+    target_mutations <- readr::read_csv(lineage.muts, show_col_types = FALSE) %>% 
       dplyr::select(-Lineage) %>%
       tidyr::unite("ALT_ID",
                    Gene, Mutation,
@@ -619,7 +619,7 @@ call_mutations <- function(sample.dir = NULL,
         #file is currently a vcf - need to get it in to "MixviR/csv format"
         variants_df <- vcf_to_mixvir(infile = paste0(sample.dir, "/", file))
       } else{
-        variants_df <- readr::read_csv(file = paste0(sample.dir, "/", file, show_col_types = FALSE))
+        variants_df <- readr::read_csv(file = paste0(sample.dir, "/", file), show_col_types = FALSE)
       }
       
       ref_w_depth <- add_depths_to_ref(ref = ref_df,
