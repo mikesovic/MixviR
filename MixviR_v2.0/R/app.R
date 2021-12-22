@@ -2,7 +2,7 @@
 #'
 #' Open Dashboard To Explore Mutation Data Stored In *samp_mutations* Data Frame Created With `call_mutations()`.
 #' @param dates path to optional csv file with cols "SAMP_NAME", "LOCATION", and "DATE". Sample names need to match those in *samp_mutations* data frame created by `call_mutations()`. Dates should be provided in the format *mmddyyyy*.
-#' @param lineage.muts path to optional csv file with cols "Gene", "Mutation", and  "Lineage" containing mutations associated with lineages of interest. See example file at "https://github.com/mikesovic/MixviR/blob/main/mutation_files/outbreak_20211202.csv". Can use this example file by setting lineage.muts to "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20211202.csv"
+#' @param lineage.muts path to optional csv file with required cols "Gene", "Mutation", and  "Lineage" containing mutations associated with lineages of interest. See example file at "https://github.com/mikesovic/MixviR/blob/main/mutation_files/outbreak_20211202.csv". Can use this example file by setting lineage.muts to "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20211202.csv". Two additional columns: "Chr" and "Pos" are optional. These provide the position of the underlying genomic mutation and are used to report the sequencing depths for relevant positions when the mutation of interest is not observed in the sample. Set *get.all.depths* to TRUE. 
 #' @keywords shiny
 #' @return Shiny Dashboard to Explore Data
 #' @export
@@ -18,7 +18,7 @@
 explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
  
   samp_data <- samp_mutations %>%
-    dplyr::select(SAMP_NAME, ALT_ID, AF, DP)
+    dplyr::select(SAMP_NAME, ALT_ID, AF, DP) 
   
   if (is.null(dates)) {
     
@@ -43,9 +43,10 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
                      into = c("Gene", "Mutation"),
                      sep = "_") %>%
             dplyr::filter(SAMP_NAME %in% input$Sample_mutTable) %>%
-            dplyr::select(SAMP_NAME, Gene, Mutation, AF) %>% 
+            dplyr::select(SAMP_NAME, Gene, Mutation, AF, DP) %>% 
             dplyr::mutate("AF" = round(AF, digits = 3)) %>% 
-            dplyr::rename("Freq" = "AF") %>%
+            dplyr::rename("Freq" = "AF",
+                          "Seq Depth" = "DP") %>%
             as.data.frame()
         })
       }  
@@ -57,7 +58,9 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
     } else{ #no dates, but do have lineage defining-mutations - get mutation table and barplot that has all lineages along x-axis.
       
       #read in mutations associated with lineages
-      lineage_muts <- readr::read_csv(lineage.muts, col_types = "ccc") %>%
+      lineage_muts <- readr::read_csv(lineage.muts, col_types = readr::cols_only(Gene = readr::col_character(),
+                                                                                 Mutation = readr::col_character(),
+                                                                                 Lineage = readr::col_character())) %>%
         tidyr::unite("ALT_ID",
               Gene, Mutation,
               sep = "_") 
@@ -99,7 +102,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
         output$lineages_present <- shiny::renderPlot({
           #get data for the selected Sample
           samp_data <- samp_data %>%
-            dplyr::filter(SAMP_NAME %in% input$Sample_VarPres)
+            dplyr::filter(SAMP_NAME %in% input$Sample_VarPres) %>%
+            dplyr::filter(AF > 0) #this applies if call_mutations was run with write.all.targets = TRUE - don't want to count things with zero reads.
           
           #get rid of any mutation duplicates, keeping one with highest AF
           #these generally occur when an amino acid change is caused by two or more SNPs - if so, it's repeated for each variant called
@@ -139,7 +143,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           
           #get data for the selected Sample
           samp_data <- samp_data %>%
-            dplyr::filter(SAMP_NAME %in% input$Sample_VarPres)
+            dplyr::filter(SAMP_NAME %in% input$Sample_VarPres) %>%
+            dplyr::filter(AF > 0) #this applies if call_mutations was run with write.all.targets = TRUE - don't want to count things with zero reads.
           
           #get rid of any mutation duplicates, keeping one with highest AF
           #these generally occur when an amino acid change is caused by two or more SNPs - if so, it's repeated for each variant called
@@ -189,7 +194,7 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           #combine all lineages associated with a given mutation - separate with ';'
           #this info will be included as a column in the table
           samp_data <- samp_data %>% 
-            dplyr::group_by(SAMP_NAME, ALT_ID, AF) %>%
+            dplyr::group_by(SAMP_NAME, ALT_ID, AF, DP) %>%
             dplyr::summarize("Group" = paste(unique(Lineage),collapse = ";")) %>% 
             dplyr::ungroup()
           
@@ -199,9 +204,10 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
                      into = c("Gene", "Mutation"),
                      sep = "_") %>%
             dplyr::filter(SAMP_NAME %in% input$Sample_MutTable) %>%
-            dplyr::select(SAMP_NAME, Gene, Mutation, AF, Group) %>% 
+            dplyr::select(SAMP_NAME, Gene, Mutation, AF, Group, DP) %>% 
             dplyr::mutate("Freq" = round(AF, digits = 3)) %>% 
-            dplyr::rename("Associated Lineage(s)" = "Group") %>%
+            dplyr::rename("Associated Lineage(s)" = "Group",
+                          "Seq Depth" = "DP") %>%
             as.data.frame()
         })
     }
@@ -257,7 +263,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           
           #filter for mutations observed with a specific sequencing depth
           samp_data <- samp_data %>%
-            dplyr::filter(DP >= input$DPThresh)
+            dplyr::filter(DP >= input$DPThresh) %>%
+            dplyr::filter(AF > 0) #this applies if call_mutations was run with write.all.targets = TRUE - don't want to count things with zero reads.
           
           #ID the mutations observed prior to the chosen date - these will be filtered out
           already_observed <- samp_data %>%
@@ -318,11 +325,6 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
         #create table with all mutations observed in selected sample. Will not include column showing any lineages they have been associated with.
         output$mut_table <- DT::renderDataTable({
           
-          #merge in info on lineages associated with specific mutations
-          #samp_data <- dplyr::left_join(x = samp_data,
-          #                       y = lineage_muts,
-          #                       by = "ALT_ID")
-          
           #create table for selected sample/date
           samp_data %>% 
             tidyr::separate(col = ALT_ID,
@@ -345,7 +347,9 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
     } else { #have both dates and lineage definitions - output all tabs
       
       #get mutations associated with lineages
-      lineage_muts <- readr::read_csv(lineage.muts, col_types = "ccc") %>%
+      lineage_muts <- readr::read_csv(lineage.muts, col_types = readr::cols_only(Gene = readr::col_character(),
+                                                                                 Mutation = readr::col_character(),
+                                                                                 Lineage = readr::col_character())) %>%
         tidyr::unite("ALT_ID",
                      Gene, Mutation,
                      sep = "_") 
@@ -418,7 +422,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
         output$lineages_present <- shiny::renderPlot({
           #filter for data for the selected Location
           samp_data <- samp_data %>%
-            dplyr::filter(Location %in% input$Location)
+            dplyr::filter(Location %in% input$Location) %>%
+            dplyr::filter(AF > 0) #this applies if call_mutations was run with write.all.targets = TRUE - don't want to count things with zero reads.
           
           #create master df that will store data for all selected lineages/variants
           all_summary <- data.frame()
@@ -499,7 +504,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
               ggplot2::ggtitle(paste0("Proportion of Lineage-Characteristic Mutations Present: ", input$Location)) +
               ggplot2::scale_x_continuous(breaks = break_days, labels = break_dates) +
               ggplot2::theme(axis.title.x = ggplot2::element_blank(),
-                    axis.text.x = ggplot2::element_text(angle = 45, size = 10, vjust = 0.4),
+                    axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.4),
+                    axis.text = ggplot2::element_text(size = 12),
                     plot.title = ggplot2::element_text (color = "black", size= 15, face="bold"),
                     axis.title.y = ggplot2::element_blank(),
                     legend.text = ggplot2::element_text(size=12),
@@ -543,7 +549,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
         output$lineage_proportions <- shiny::renderPlot({
           #filter for data for the selected Location
           samp_data <- samp_data %>%
-            dplyr::filter(Location %in% input$Location)
+            dplyr::filter(Location %in% input$Location) %>%
+            dplyr::filter(AF > 0) #this applies if call_mutations was run with write.all.targets = TRUE - don't want to count things with zero reads.
           
           #create master df that will store data for all selected lineages
           all_summary <- data.frame()
@@ -619,7 +626,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           #merge in lineage information
           samp_data <- dplyr::left_join(x = samp_data,
                                         y = lineage_muts,
-                                        by = "ALT_ID")
+                                        by = "ALT_ID") %>%
+            dplyr::filter(AF > 0) #this applies if call_mutations was run with write.all.targets = TRUE - don't want to count things with zero reads.
           
           #filter for mutations observed with a specific sequencing depth
           #get all lineages a given mutation is associated with as a ';'-delimited string - will be printed to column
@@ -695,8 +703,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           
           #combine all lineages associated with a given mutation - separate with ';'
           samp_data <- samp_data %>% 
-            dplyr::group_by(SAMP_NAME, Location, date, ALT_ID, AF) %>%
-            dplyr::summarize("Group" = paste(unique(Lineage),collapse = ";")) %>% 
+            dplyr::group_by(SAMP_NAME, Location, date, ALT_ID, AF, DP) %>%
+            dplyr::summarize("Group" = paste(unique(Lineage),collapse = ";")) %>%
             dplyr::ungroup()
           
           #create table for selected sample/date
@@ -706,11 +714,12 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
                      sep = "_") %>%
             dplyr::filter(Location %in% input$Location_MutTable) %>%
             dplyr::filter(date == input$Date) %>%
-            dplyr::select(SAMP_NAME, Location, date, Gene, Mutation, AF, Group) %>% 
+            dplyr::select(SAMP_NAME, Location, date, Gene, Mutation, AF, Group, DP) %>% 
             dplyr::mutate("AF" = round(AF, digits = 3)) %>% 
             dplyr::rename("Date" = "date", 
                           "Associated Lineage(s)" = "Group",
-                          "Freq" = "AF") %>%
+                          "Freq" = "AF",
+                          "Seq Depth" = "DP") %>%
             as.data.frame()
         })
         

@@ -400,6 +400,10 @@ id_indels <- function(variant.calls, ref) {
 #' @param write.mut.table Logical indicating whether to write the 'samp_mutations' data frame (see "Value" below) to a text file in the current working directory. Default = FALSE.
 #' @param fasta.genome fasta formatted reference genome file.
 #' @param bed bed file defining features of interest (open reading frames to translate). Should be tab delimited and have 4 columns (no column names): chr, start, end, feature_name
+#' @param indel.format Defines the naming convention for indels. Default is "Fwd", meaning the name would look like S_del144. "Rev" switches this to S_144del.
+#' @param lineage.muts path to optional csv file with required cols "Gene", "Mutation", and  "Lineage" containing mutations associated with lineages of interest. See example file at "https://github.com/mikesovic/MixviR/blob/main/mutation_files/outbreak_20211202.csv". Can use this example file by setting lineage.muts to "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20211202.csv". Two additional columns: "Chr" and "Pos" are optional. These provide the position of the underlying genomic mutation and are used to report the sequencing depths for relevant positions when the mutation of interest is not observed in the sample. See *write.all.targets*. This file is commonly used in `explore_mutations()`. Only necessary here in conjunction with *write.all.targets* option.  
+#' @param write.all.targets Logical that, if TRUE, reports sequencing depths for genomic positions associated with mutations of interest that are not observed in the sample, in addition to all mutations observed in the sample. If TRUE, requires columns "Chr" and "Pos" to be included in the *lineage.muts* file. Default FALSE.
+
 #' @keywords mutation
 #' @return Object 'samp_mutations' stored in the global environment. Specifically, a data frame containing amino acid changes observed for each sample, positions of the underlying mutations, and other information.
 #' @export
@@ -413,7 +417,10 @@ call_mutations <- function(sample.dir = NULL,
                            reference = "custom",
                            write.mut.table = FALSE,
                            fasta.genome,
-                           bed) {
+                           bed,
+                           indel.format = "Fwd",
+                           lineage.muts = NULL,
+                           write.all.targets = FALSE) {
 
   
   samp_files <- dir(sample.dir)
@@ -566,14 +573,101 @@ call_mutations <- function(sample.dir = NULL,
   samp_mutations <- all_variants %>%
     dplyr::select(samp_name, CHR, POS, GENE, ALT_ID, AF, ALT_COUNT, DP) %>%
     dplyr::rename("SAMP_NAME" = "samp_name")
+  
+  if (indel.format == "Rev") {
+    samp_mutations <- samp_mutations %>%
+      dplyr::mutate("ALT_ID" = stringr::str_replace(ALT_ID, "(F?del)(.+)", "\\2\\1"))
+  }
 
+  if (write.all.targets == "TRUE") {
+    
+    #read in the file that associated genomic positions with mutations of interest and lineage
+    target_mutations <- readr::read_csv(lineage.muts) %>% 
+      dplyr::select(-Lineage) %>%
+      tidyr::unite("ALT_ID",
+                   Gene, Mutation,
+                   sep  = "_") %>%
+      tidyr::drop_na()
+    #end up here with ALT_ID, Chr, Pos in target_mutations
+    
+    all_variants <- data.frame()
+    
+    for (curr_file in samp_files) {
+      curr_samp <- curr_file
+      
+      #get the names reported in SAMP_NAME, if edited from file name. Original file name is still stored as samp_files[X]
+      if (!is.null(name.sep)) {
+        curr_samp <- gsub(paste0("(.+?)", name.sep, "(.*)"), "\\1", curr_file)
+      }
+      
+      #filter to get mutations observed in the current sample
+      samp_muts_filt <- samp_mutations %>%
+        dplyr::filter(SAMP_NAME == curr_samp)
+      
+      #get the set of mutations of interest that didn't appear in the sample
+      not_in_samp <- dplyr::anti_join(x = target_mutations,
+                                      y = samp_muts_filt,
+                                      by  = "ALT_ID") %>%
+        tidyr::unite("Chr_pos",
+                     Chr, Pos,
+                     sep = ";;;;")
+      
+      ref_df <- ref_no_dp
+      
+      #get depths for positions associated with each mutation of interest not observed in the current sample
+      if (csv.infiles == FALSE) {
+        #file is currently a vcf - need to get it in to "MixviR/csv format"
+        variants_df <- vcf_to_mixvir(infile = paste0(sample.dir, "/", file))
+      } else{
+        variants_df <- readr::read_csv(file = paste0(sample.dir, "/", file, show_col_types = FALSE))
+      }
+      
+      ref_w_depth <- add_depths_to_ref(ref = ref_df,
+                                       samp.variants = variants_df)
+      
+      depths <- ref_w_depth %>%
+        dplyr::select(CHR, POS, DP) %>%
+        tidyr::unite("Chr_pos",
+                     CHR, POS,
+                     sep = ";;;;")
+        
+      depths <<- depths
+      not_in_samp <<- not_in_samp
+      
+      not_in_samp <- dplyr::left_join(x = not_in_samp,
+                                      y = depths,
+                                      by = "Chr_pos")
+      
+      not_in_samp <- not_in_samp %>%
+        dplyr::mutate("SAMP_NAME" = curr_samp,
+                      "ALT_COUNT" = 0,
+                      "DP" = DP) %>%
+        tidyr::separate(col = "Chr_pos",
+                        into = c("CHR", "POS"),
+                        sep = ";;;;") %>%
+        tidyr::separate(col = "ALT_ID",
+                        into = c("GENE", "ALT_ID"),
+                        sep = "_") %>%
+        dplyr::mutate("AF" = ALT_COUNT/DP,
+                      "POS" = as.integer(POS),
+                      "ALT_ID" = paste0(GENE, "_", ALT_ID)) %>%
+        dplyr::select(SAMP_NAME, CHR, POS, GENE, ALT_ID, AF, ALT_COUNT, DP)
+      
+      all_variants <- dplyr::bind_rows(all_variants, samp_muts_filt, not_in_samp)
+      
+    }
+    
+    samp_mutations <- all_variants
+  }
+  
+  
   if (write.mut.table == TRUE) {
     write.table(samp_mutations, file = "sample_mutations.tsv",
                 sep = "\t",
                 row.names = FALSE,
                 quote = FALSE)
   }
-
+  
   samp_mutations <<- samp_mutations
 }
 

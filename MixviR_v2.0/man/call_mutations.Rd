@@ -12,7 +12,10 @@ call_mutations(
   reference = "custom",
   write.mut.table = FALSE,
   fasta.genome,
-  bed
+  bed,
+  indel.format = "Fwd",
+  lineage.muts = NULL,
+  write.all.targets = FALSE
 )
 }
 \arguments{
@@ -29,6 +32,12 @@ call_mutations(
 \item{fasta.genome}{fasta formatted reference genome file.}
 
 \item{bed}{bed file defining features of interest (open reading frames to translate). Should be tab delimited and have 4 columns (no column names): chr, start, end, feature_name}
+
+\item{indel.format}{Defines the naming convention for indels. Default is "Fwd", meaning the name would look like S_del144. "Rev" switches this to S_144del.}
+
+\item{lineage.muts}{path to optional csv file with required cols "Gene", "Mutation", and  "Lineage" containing mutations associated with lineages of interest. See example file at "https://github.com/mikesovic/MixviR/blob/main/mutation_files/outbreak_20211202.csv". Can use this example file by setting lineage.muts to "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20211202.csv". Two additional columns: "Chr" and "Pos" are optional. These provide the position of the underlying genomic mutation and are used to report the sequencing depths for relevant positions when the mutation of interest is not observed in the sample. See \emph{write.all.targets}. This file is commonly used in \code{explore_mutations()}. Only necessary here in conjunction with \emph{write.all.targets} option.}
+
+\item{write.all.targets}{Logical that, if TRUE, reports sequencing depths for genomic positions associated with mutations of interest that are not observed in the sample, in addition to all mutations observed in the sample. If TRUE, requires columns "Chr" and "Pos" to be included in the \emph{lineage.muts} file. Default FALSE.}
 
 \item{csv.input}{Logical to indicate whether files in \emph{sample.dir} directory are in vcf or csv format. All files must be of the same format. If csv, they must contain columns named: "CHR"    "POS"    "REF"    "ALT"    "DP"    "ALT_COUNT". See the `batch_vcf_to_mixvir()`` function to convert vcfs to csv format (csv may be slightly faster for running call_mutations()). Default is FALSE (input is in vcf format).}
 }
