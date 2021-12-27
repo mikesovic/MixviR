@@ -4,12 +4,14 @@
 \alias{explore_mutations}
 \title{MixviR Shiny Dashboard}
 \usage{
-explore_mutations(dates = NULL, lineage.muts = NULL)
+explore_mutations(dates = NULL, lineage.muts = NULL, read.muts.from = NULL)
 }
 \arguments{
 \item{dates}{path to optional csv file with cols "SAMP_NAME", "LOCATION", and "DATE". Sample names need to match those in \emph{samp_mutations} data frame created by \code{call_mutations()}. Dates should be provided in the format \emph{mmddyyyy}.}
 
 \item{lineage.muts}{path to optional csv file with required cols "Gene", "Mutation", and  "Lineage" containing mutations associated with lineages of interest. See example file at "https://github.com/mikesovic/MixviR/blob/main/mutation_files/outbreak_20211202.csv". Can use this example file by setting lineage.muts to "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20211202.csv". Two additional columns: "Chr" and "Pos" are optional. These provide the position of the underlying genomic mutation and are used to report the sequencing depths for relevant positions when the mutation of interest is not observed in the sample. Set \emph{get.all.depths} to TRUE.}
+
+\item{read.muts.from}{By default, data are read from \emph{samp_mutations} data frame created by \code{call_mutations()} and written to the global environment. If this data frame has been written to a file (see \emph{write.mut.table} in \code{call_mutations()}), the dashboard can optionally be opened by providing the path to that file.}
 }
 \value{
 Shiny Dashboard to Explore Data

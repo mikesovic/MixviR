@@ -3,6 +3,7 @@
 #' Open Dashboard To Explore Mutation Data Stored In *samp_mutations* Data Frame Created With `call_mutations()`.
 #' @param dates path to optional csv file with cols "SAMP_NAME", "LOCATION", and "DATE". Sample names need to match those in *samp_mutations* data frame created by `call_mutations()`. Dates should be provided in the format *mmddyyyy*.
 #' @param lineage.muts path to optional csv file with required cols "Gene", "Mutation", and  "Lineage" containing mutations associated with lineages of interest. See example file at "https://github.com/mikesovic/MixviR/blob/main/mutation_files/outbreak_20211202.csv". Can use this example file by setting lineage.muts to "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20211202.csv". Two additional columns: "Chr" and "Pos" are optional. These provide the position of the underlying genomic mutation and are used to report the sequencing depths for relevant positions when the mutation of interest is not observed in the sample. Set *get.all.depths* to TRUE. 
+#' @param read.muts.from By default, data are read from *samp_mutations* data frame created by `call_mutations()` and written to the global environment. If this data frame has been written to a file (see *write.mut.table* in `call_mutations()`), the dashboard can optionally be opened by providing the path to that file.  
 #' @keywords shiny
 #' @return Shiny Dashboard to Explore Data
 #' @export
@@ -15,10 +16,15 @@
 ##If dates are defined but lineages aren't, get new mutations table, mutation freq plot, and mutations table (with no lineages).
 ##If neither are defined, get just mutations table with no lineages.
 
-explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
+explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from = NULL) {
  
-  samp_data <- samp_mutations %>%
-    dplyr::select(SAMP_NAME, ALT_ID, AF, DP) 
+  if (is.null(read.muts.from)) {
+    samp_data <- samp_mutations %>%
+      dplyr::select(SAMP_NAME, CHR, POS, ALT_ID, AF, DP) 
+  } else {
+    samp_data <- readr::read_tsv(read.muts.from, show_col_types = FALSE) %>%
+      dplyr::select(SAMP_NAME, CHR, POS, ALT_ID, AF, DP) 
+  }
   
   if (is.null(dates)) {
     
@@ -40,13 +46,13 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           #create table for selected sample
           samp_data %>% 
             tidyr::separate(col = ALT_ID,
-                     into = c("Gene", "Mutation"),
+                     into = c("GENE", "MUTATION"),
                      sep = "_") %>%
             dplyr::filter(SAMP_NAME %in% input$Sample_mutTable) %>%
-            dplyr::select(SAMP_NAME, Gene, Mutation, AF, DP) %>% 
+            dplyr::select(SAMP_NAME, CHR, POS, GENE, MUTATION, AF, DP) %>% 
             dplyr::mutate("AF" = round(AF, digits = 3)) %>% 
-            dplyr::rename("Freq" = "AF",
-                          "Seq Depth" = "DP") %>%
+            dplyr::rename("FREQ" = "AF",
+                          "SEQ DEPTH" = "DP") %>%
             as.data.frame()
         })
       }  
@@ -194,20 +200,20 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           #combine all lineages associated with a given mutation - separate with ';'
           #this info will be included as a column in the table
           samp_data <- samp_data %>% 
-            dplyr::group_by(SAMP_NAME, ALT_ID, AF, DP) %>%
+            dplyr::group_by(SAMP_NAME, CHR, POS, ALT_ID, AF, DP) %>%
             dplyr::summarize("Group" = paste(unique(Lineage),collapse = ";")) %>% 
             dplyr::ungroup()
           
           #create table for selected sample
           samp_data %>% 
             tidyr::separate(col = ALT_ID,
-                     into = c("Gene", "Mutation"),
+                     into = c("GENE", "MUTATION"),
                      sep = "_") %>%
             dplyr::filter(SAMP_NAME %in% input$Sample_MutTable) %>%
-            dplyr::select(SAMP_NAME, Gene, Mutation, AF, Group, DP) %>% 
-            dplyr::mutate("Freq" = round(AF, digits = 3)) %>% 
-            dplyr::rename("Associated Lineage(s)" = "Group",
-                          "Seq Depth" = "DP") %>%
+            dplyr::select(SAMP_NAME, CHR, POS, GENE, MUTATION, AF, Group, DP) %>% 
+            dplyr::mutate("FREQ" = round(AF, digits = 3)) %>% 
+            dplyr::rename("ASSOCIATED LINEAGE(S)" = "Group",
+                          "SEQ DEPTH" = "DP") %>%
             as.data.frame()
         })
     }
@@ -328,14 +334,16 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           #create table for selected sample/date
           samp_data %>% 
             tidyr::separate(col = ALT_ID,
-                     into = c("Gene", "Mutation"),
+                     into = c("GENE", "MUTATION"),
                      sep = "_") %>%
             dplyr::filter(SAMP_NAME %in% input$Sample_MutTable) %>%
             dplyr::filter(date == input$Date) %>%
-            dplyr::select(SAMP_NAME, Location, date, Gene, Mutation, AF) %>% 
-            dplyr::mutate("Freq" = round(AF, digits = 3)) %>% 
-            dplyr::rename("Date" = "date") %>%
+            dplyr::select(SAMP_NAME, Location, date, CHR, POS, GENE, MUTATION, AF) %>% 
+            dplyr::mutate("FREQ" = round(AF, digits = 3)) %>% 
+            dplyr::rename("DATE" = "date",
+                          "LOCATION" = "Location") %>%
             dplyr::select(-AF) %>%
+            dplyr::select(SAMP_NAME, LOCATION, DATE, CHR, POS, GENE, MUTATION, FREQ)
             as.data.frame()
         })
         
@@ -703,23 +711,24 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL) {
           
           #combine all lineages associated with a given mutation - separate with ';'
           samp_data <- samp_data %>% 
-            dplyr::group_by(SAMP_NAME, Location, date, ALT_ID, AF, DP) %>%
+            dplyr::group_by(SAMP_NAME, Location, date, CHR, POS, ALT_ID, AF, DP) %>%
             dplyr::summarize("Group" = paste(unique(Lineage),collapse = ";")) %>%
             dplyr::ungroup()
           
           #create table for selected sample/date
           samp_data %>% 
             tidyr::separate(col = ALT_ID,
-                     into = c("Gene", "Mutation"),
+                     into = c("GENE", "MUTATION"),
                      sep = "_") %>%
             dplyr::filter(Location %in% input$Location_MutTable) %>%
             dplyr::filter(date == input$Date) %>%
-            dplyr::select(SAMP_NAME, Location, date, Gene, Mutation, AF, Group, DP) %>% 
+            dplyr::select(SAMP_NAME, Location, date, CHR, POS, Gene, Mutation, AF, Group, DP) %>% 
             dplyr::mutate("AF" = round(AF, digits = 3)) %>% 
-            dplyr::rename("Date" = "date", 
-                          "Associated Lineage(s)" = "Group",
-                          "Freq" = "AF",
-                          "Seq Depth" = "DP") %>%
+            dplyr::rename("DATE" = "date", 
+                          "ASSOCIATED LINEAGE(S)" = "Group",
+                          "FREQ" = "AF",
+                          "SEQ DEPTH" = "DP",
+                          "LOCATION" = "Location") %>%
             as.data.frame()
         })
         

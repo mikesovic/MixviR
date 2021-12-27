@@ -648,7 +648,8 @@ call_mutations <- function(sample.dir = NULL,
         dplyr::mutate("AF" = ALT_COUNT/DP,
                       "POS" = as.integer(POS),
                       "ALT_ID" = paste0(GENE, "_", ALT_ID)) %>%
-        dplyr::select(SAMP_NAME, CHR, POS, GENE, ALT_ID, AF, ALT_COUNT, DP)
+        dplyr::select(SAMP_NAME, CHR, POS, GENE, ALT_ID, AF, ALT_COUNT, DP) %>%
+        dplyr::distinct(.keep_all = TRUE)
       
       all_variants <- dplyr::bind_rows(all_variants, samp_muts_filt, not_in_samp)
       
