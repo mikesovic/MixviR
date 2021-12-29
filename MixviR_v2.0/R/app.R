@@ -253,8 +253,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
                         shiny::plotOutput(outputId = "mut_freqs")),
         shiny::tabPanel("View Mutations",
                        shiny::selectInput(inputId = "Sample_MutTable",
-                             label = "Sample",
-                             choices = unique(samp_data$SAMP_NAME)),
+                             label = "Location",
+                             choices = unique(samp_data$Location)),
                         shiny::selectInput(inputId = "Date",
                              label = "Date",
                              choices = unique(samp_data$date)),
@@ -305,7 +305,7 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             dplyr::filter(ALT_ID %in% target_muts) %>%
             ggplot2::ggplot(ggplot2::aes(x = date, y = AF, color = Location)) +
             ggplot2::geom_line() +
-            ggplot2::geom_point() +
+            ggplot2::geom_point(size = 3) +
             ggplot2::facet_wrap(dplyr::vars(c(ALT_ID))) +
             ggplot2::coord_cartesian(ylim = c(0,1)) +
             ggplot2::theme(legend.text = ggplot2::element_text(size=12),
@@ -319,7 +319,7 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
         #update the "Date" drop-down box to only include dates for which samples exist for the selected Sample
         shiny::observeEvent(input$Sample_MutTable, {
           date_options <- samp_data %>%
-            dplyr::filter(SAMP_NAME == input$Sample_MutTable) %>%
+            dplyr::filter(Location == input$Sample_MutTable) %>%
             dplyr::distinct(date) 
           date_options <- date_options$date
           
@@ -336,14 +336,14 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             tidyr::separate(col = ALT_ID,
                      into = c("GENE", "MUTATION"),
                      sep = "_") %>%
-            dplyr::filter(SAMP_NAME %in% input$Sample_MutTable) %>%
+            dplyr::filter(Location %in% input$Sample_MutTable) %>%
             dplyr::filter(date == input$Date) %>%
             dplyr::select(SAMP_NAME, Location, date, CHR, POS, GENE, MUTATION, AF) %>% 
             dplyr::mutate("FREQ" = round(AF, digits = 3)) %>% 
             dplyr::rename("DATE" = "date",
                           "LOCATION" = "Location") %>%
             dplyr::select(-AF) %>%
-            dplyr::select(SAMP_NAME, LOCATION, DATE, CHR, POS, GENE, MUTATION, FREQ)
+            dplyr::select(SAMP_NAME, LOCATION, DATE, CHR, POS, GENE, MUTATION, FREQ) %>%
             as.data.frame()
         })
         
@@ -521,7 +521,7 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
               ggplot2::geom_hline(yintercept = input$propThresh, color = "red", linetype = 2, alpha = 0.6) +
               ggplot2::geom_point(data = all_summary, mapping = ggplot2::aes(x = days, 
                                                            y = prop_observed,
-                                                           fill = `Mean Coverage`)) +
+                                                           fill = `Mean Coverage`), size = 2) +
               ggplot2::scale_fill_gradient(low = "#56B1F7", 
                                     high = "#132B43",
                                     limits = c(0,4200))
@@ -678,7 +678,7 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             dplyr::filter(ALT_ID %in% target_muts) %>%
             ggplot2::ggplot(ggplot2::aes(x = date, y = AF, color = Location)) +
             ggplot2::geom_line() +
-            ggplot2::geom_point() +
+            ggplot2::geom_point(size = 3) +
             ggplot2::facet_wrap(dplyr::vars(c(ALT_ID))) +
             ggplot2::coord_cartesian(ylim = c(0,1)) +
             ggplot2::theme(legend.text = ggplot2::element_text(size=12),
@@ -722,7 +722,7 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
                      sep = "_") %>%
             dplyr::filter(Location %in% input$Location_MutTable) %>%
             dplyr::filter(date == input$Date) %>%
-            dplyr::select(SAMP_NAME, Location, date, CHR, POS, Gene, Mutation, AF, Group, DP) %>% 
+            dplyr::select(SAMP_NAME, Location, date, CHR, POS, GENE, MUTATION, AF, Group, DP) %>% 
             dplyr::mutate("AF" = round(AF, digits = 3)) %>% 
             dplyr::rename("DATE" = "date", 
                           "ASSOCIATED LINEAGE(S)" = "Group",
