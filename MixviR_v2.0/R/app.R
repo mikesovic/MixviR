@@ -137,7 +137,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             ggplot2::theme_classic() +
             ggplot2::ggtitle(paste0("Proportion of Lineage-Characteristic Mutations Present: ", input$Sample_VarPres)) +
             ggplot2::theme(axis.title.x = ggplot2::element_blank(),
-                  axis.text.x = ggplot2::element_text(angle = 45, size = 14, vjust = 0.4),
+                  axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.4),
+                  axis.text = ggplot2::element_text(size = 13),
                   axis.text.y = ggplot2::element_text(size = 14),
                   plot.title = ggplot2::element_text (color = "black", size= 18, face="bold"),
                   axis.title.y = ggplot2::element_blank()) +
@@ -181,7 +182,8 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             ggplot2::theme_classic() +
             ggplot2::ggtitle(paste0("Estimated Frequency of Variants Present In Sample: ", input$Sample_VarPres)) +
             ggplot2::theme(axis.title.x = ggplot2::element_blank(),
-                  axis.text.x = ggplot2::element_text(angle = 45, size = 14, vjust = 0.4),
+                  axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.4),
+                  axis.text = ggplot2::element_text(size = 13),
                   plot.title = ggplot2::element_text (color = "black", size= 18, face="bold"),
                   axis.text.y = ggplot2::element_text(size = 14),
                   axis.title.y = ggplot2::element_blank()) +
@@ -308,11 +310,12 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             ggplot2::geom_point(size = 3) +
             ggplot2::facet_wrap(dplyr::vars(c(ALT_ID))) +
             ggplot2::coord_cartesian(ylim = c(0,1)) +
-            ggplot2::theme(legend.text = ggplot2::element_text(size=12),
+            ggplot2::theme(legend.text = ggplot2::element_text(size = 13),
                            legend.title = ggplot2::element_text(size = 14),
                            strip.text = ggplot2::element_text(size = 14),
-                           axis.text = ggplot2::element_text(size = 12),
-                           axis.title.y = ggplot2::element_text(size = 12)) +
+                           axis.text.x = ggplot2::element_text(size = 12),
+                           axis.text.y = ggplot2::element_text(size = 13),
+                           axis.title.y = ggplot2::element_text(size = 13)) +
             ggplot2::labs(y = "Mutation Frequency", x = NULL)
         })
         
@@ -384,7 +387,10 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
                                             shiny::sliderInput(inputId = "propThresh",
                                                 label = "Presence Threshold",
                                                 min = 0, max = 1,
-                                                value = 0.5)),
+                                                value = 0.5),
+                                            shiny::selectInput(inputId = "PlotType",
+                                                               label = "View Plot As...",
+                                                               choices = c("Line Plot", "Area Plot"))),
                         shiny::mainPanel(width = 10,
                                          shiny::verticalLayout(
                                            shiny::plotOutput(outputId = "lineages_present"),
@@ -501,28 +507,31 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             all_summary <- all_summary %>% 
               dplyr::select(-`Mean Coverage`) %>%
               dplyr::rename("Mean Coverage" = "Mean_Coverage_All")
-            
-            #generate plot
+          }
+          
+          #generate plot
+          if (input$PlotType == "Area Plot") {
             all_summary %>% 
               dplyr::rename("Lineage (n)" = "lineage_n") %>%
               ggplot2::ggplot(ggplot2::aes(x = days, y = prop_observed)) +
-              ggplot2::geom_line(ggplot2::aes(colour = `Lineage (n)`, group = `Lineage (n)`)) +
+              #ggplot2::geom_line(ggplot2::aes(colour = `Lineage (n)`, group = `Lineage (n)`)) +
+              ggplot2::geom_area(ggplot2::aes(fill = `Lineage (n)`), stat = "identity", position = "identity", alpha = 0.5) +
               ggplot2::coord_cartesian(ylim = c(0,1)) +
               ggplot2::theme_classic() +
               ggplot2::ggtitle(paste0("Proportion of Lineage-Characteristic Mutations Present: ", input$Location)) +
               ggplot2::scale_x_continuous(breaks = break_days, labels = break_dates) +
               ggplot2::theme(axis.title.x = ggplot2::element_blank(),
-                    axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.4),
-                    axis.text = ggplot2::element_text(size = 12),
+                    axis.text.x = ggplot2::element_text(angle = 45, size = 12, vjust = 0.4),
+                    axis.text.y = ggplot2::element_text(size = 13),
                     plot.title = ggplot2::element_text (color = "black", size= 15, face="bold"),
                     axis.title.y = ggplot2::element_blank(),
-                    legend.text = ggplot2::element_text(size=12),
+                    legend.text = ggplot2::element_text(size = 13),
                     legend.title = ggplot2::element_text(size = 14)) +
               ggplot2::geom_hline(yintercept = input$propThresh, color = "red", linetype = 2, alpha = 0.6) +
               ggplot2::geom_point(data = all_summary, mapping = ggplot2::aes(x = days, 
                                                            y = prop_observed,
-                                                           fill = `Mean Coverage`), size = 2) +
-              ggplot2::scale_fill_gradient(low = "#56B1F7", 
+                                                           color = `Mean Coverage`), size = 2) +
+              ggplot2::scale_color_gradient(low = "#56B1F7", 
                                     high = "#132B43",
                                     limits = c(0,4200))
           } else {
@@ -535,18 +544,19 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
               ggplot2::ggtitle(paste0("Proportion of Lineage-Characteristic Mutations Present: ", input$Location)) +
               ggplot2::scale_x_continuous(breaks = break_days, labels = break_dates) +
               ggplot2::theme(axis.title.x = ggplot2::element_blank(),
-                             axis.text.x = ggplot2::element_text(angle = 45, size = 10, vjust = 0.4),
+                             axis.text.x = ggplot2::element_text(angle = 45, size = 12, vjust = 0.4),
+                             axis.text.y = ggplot2::element_text(size = 13),
                              plot.title = ggplot2::element_text (color = "black", size= 15, face="bold"),
                              axis.title.y = ggplot2::element_blank(),
-                             legend.text = ggplot2::element_text(size=12),
+                             legend.text = ggplot2::element_text(size = 13),
                              legend.title = ggplot2::element_text(size = 14)) +
               ggplot2::geom_hline(yintercept = input$propThresh, color = "red", linetype = 2, alpha = 0.6) +
               ggplot2::geom_point(data = all_summary, mapping = ggplot2::aes(x = days, 
                                                                              y = prop_observed,
-                                                                             fill = `Mean Coverage`)) +
+                                                                             fill = `Mean Coverage`), size = 2) +
               ggplot2::scale_fill_gradient(low = "#56B1F7", 
-                                           high = "#132B43",
-                                           limits = c(0,4200))
+                                            high = "#132B43",
+                                            limits = c(0,4200))
             
           }
           
@@ -620,10 +630,11 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             ggplot2::ggtitle(paste0("Estimated Frequency of Each Lineage Present: ", input$Location)) +
             ggplot2::scale_x_continuous(breaks = break_days, labels = break_dates) +
             ggplot2::theme(axis.title.x = ggplot2::element_blank(),
-                  axis.text.x = ggplot2::element_text(angle = 45, size = 10, vjust = 0.4),
+                  axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.4),
+                  axis.text = ggplot2::element_text(size = 13),
                   plot.title = ggplot2::element_text (color = "black", size= 15, face="bold"),
                   axis.title.y = ggplot2::element_blank(),
-                  legend.text = ggplot2::element_text(size=12),
+                  legend.text = ggplot2::element_text(size = 13),
                   legend.title = ggplot2::element_text(size = 14))
           
         })
@@ -681,11 +692,12 @@ explore_mutations <- function(dates = NULL, lineage.muts = NULL, read.muts.from 
             ggplot2::geom_point(size = 3) +
             ggplot2::facet_wrap(dplyr::vars(c(ALT_ID))) +
             ggplot2::coord_cartesian(ylim = c(0,1)) +
-            ggplot2::theme(legend.text = ggplot2::element_text(size=12),
+            ggplot2::theme(legend.text = ggplot2::element_text(size = 13),
                            legend.title = ggplot2::element_text(size = 14),
                            strip.text = ggplot2::element_text(size = 14),
-                           axis.text = ggplot2::element_text(size = 12),
-                           axis.title.y = ggplot2::element_text(size = 12)) +
+                           axis.text.x = ggplot2::element_text(size = 12),
+                           axis.text.y = ggplot2::element_text(size = 13),
+                           axis.title.y = ggplot2::element_text(size = 13)) +
             ggplot2::labs(y = "Mutation Frequency", x = NULL)
         })
         
