@@ -1,0 +1,190 @@
+---
+title: "MixviR_v2.0.0"
+author: "Mike Sovic"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MixviR_v2.0.0}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+MixviR is a package designed to aid in exploring and visualizing genomic and amino-acid level variation obtained from high-throughput sequencing samples, including samples that contain mixtures of genotypes. The package was originally written to detect and estimate relative frequencies of Sars-Cov2 lineages (variants) from environmental samples. However, it can in theory be applied to any microbial taxon, though there may be some memory-associated limits for taxa with large genome sizes (hasn't been widely tested on other taxa). 
+
+## Inputs
+
+### Required
+
+There are three required inputs for running MixviR in its most basic form...
+
+1.) Sample data are provided as variant call format (vcf) files - one for each sample to be analyzed. These vcf files are expected to contain the "DP" and "AD" flags in the FORMAT field. Bedtools (mpileup/call) and the GATK offer two widely-used workflows for generating these vcf files. Below is some example bash code I've used for generating these files (most argument can be customized as needed - adding the FORMAT/AD AND FORMAT/DP fields is important)...
+
+[*path to bcftools*]/bcftools mpileup -f *fasta reference* -d 4000 -q 60 -Q 30 -L 4500 --ff UNMAP,SECONDARY,QCFAIL -a FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,INFO/AD,INFO/ADF,INFO/ADR *input.bam* | [*path to bcftools*]/bcftools call -m -A -Ov -o out_temp.vcf
+
+[*path to bcftools*]/bcftools norm out_temp.vcf -c w -f *fasta reference* -m -both -Ov -o out.vcf
+
+
+2.) The other two necessary inputs define the reference information for the taxon of interest. They include...
+
+ - a fasta-formatted reference genome file 
+ - an associated bed-formatted file that defines the translated regions of the genome (ORF's/genes). This bed file should be tab delimited with 4 columns: chromosome, feature start position, feature end position, feature name. Column names should not be included. 
+
+Pre-defined reference information is available from Sars_Cov2, so only sample vcf files are necessary in that case.
+
+### Optional
+
+There are two optional input files...
+
+1.) Lineage-associated mutations: File (csv) that provides mutations (amino acid mutations) associated with lineages/groups of interest. Requires columns named "Gene", "Mutation", and  "Lineage". Two additional columns can be included named "Chr" and "Pos". The file (without the optional colummns) should look like...
+
+
+![Lineage-associated mutation file preview](~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/images/lineage_muts_example.png)
+The "Chr" and "Pos" represent the chromosome and associated genomic position giving rise to the mutation. These columns are included if, as part of the results, you want the program to return the sequencing depth at the position when the mutation is not observed for a sample. In other words, is the mutation absent in the sample because it doesn't exist, or because the sequencing coverage at that position is insufficient. If these columns are included, make sure the Chromosome names match those in the reference genome.
+
+2.) Location/Date File: If samples are taken from the same location at different time points, the temporal (date) information can be included by providing a csv file that associates the sample dates and locations with each unique sample name. The file should contain columns named "SAMP_NAME", "LOCATION", and "DATE", and should look like...
+
+![location/dates file](~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/images/location_dates_example.png)
+
+## Primary Functions
+
+There are two primary functions when running MixviR...
+
+### `call_mutations()`
+
+ - **Description:** The `call_mutations()` function reads in the variant calls from the vcf file, translates the associated amino acids, and pulls out any mutations at the amino acid level (substituions, insertions, or deletions). 
+
+ - **Common Options:** Required options to call_mutations() include *sample.dir*, which is the path to a directory storing one or more vcf files (one for each sample to analyze). There should be no other files in this directory. Also required is information on the reference genome, which can be passed using the combination of *fasta.genome* and *bed* options. Alternatively, if working with Sars-Cov2, the *reference* option can be set to "Wuhan" to use a pre-formatted reference. To report information on all mutations of interest and not just those that are observed in the samples, the *write.all.targets* option can be set to TRUE, and the lineage-associated mutations file including the optional "Chr" and "Pos" columns (see above) must be specified with *lineage.muts*.
+
+ - **Output:** Mutation data are written to an object named *samp_mutations* that's stored in the global environment and that by default serves as the primary input for the `explore_mutations()` function. This object can also be written to a file (see *write.mut.table*). 
+ 
+
+### `explore_mutations()`
+
+The `explore_mutations()` function opens an interactive RShiny dashboard that allows you to explore the data. The dashboard will have from 1 to 4 tabs at the top, depending on what combination of optional input files (if any) are provided...
+
+ - **Lineages Present:** Available if the lineage/mutation file is provided with the *lineage.muts* option. The top plot represents the proportion of "lineage-characteristic mutations" present in the sample. These "lineage-characteristic mutations" are the set of mutations from the *lineage.muts* file that occur only in the selected lineage. In other words, MixviR looks through the set of mutations provided and removes any that are shared by more than one lineage. The remaining mutations are used to generate the plots in this tab. The "Presence Threshold" slider on the left allows the user to set a threshold for the proportion of such mutations required to consider a lineage as present in the sample. For each lineage identified as present (exceeding the threshold), the frequences of the lineage-characteristic mutations that occur in the sample are averaged to estimate a relative frequency of the lineage in the sample - these estimated relative frequencies are shown in the bottom plot. Note that while biologically the sums of these estimated proportions shouldn't exceed 1, there is no constraint with the way these are calculated, and occasionaly the bars will exceed 1. When this happens, it likely means that at least one mutation that was identified and used as a "lineage-characteristic" mutation based on the provided list is, in reality, shared among lineages.
+ 
+  - **New Mutations:** Present if a location/dates file is provided with the *dates* option. Table that lists all mutations first observed (across the entire dataset) on or after the selected date. So, if the mutation S_D614G was not observed in any sample before 6/20/2021, and then on that date was observed in a single sample, and then continued to be observed in multiple samples after that date, that mutation would show up in the New Mutations table for the date 6/20/21, and for any date prior to that, but would not show up if 6/21/21 or any date after is selected. If the *lineage.muts* option is defined, a column is added to the table that includes all lineages the mutation is associated with.
+  
+  - **Mutation Frequencies:** Present if a location/dates file is provided with the *dates* option. Plots show estimated frequencies of a specific mutation(s) over time for one or more samples. Mutations should be entered in the form S_D614G for a substitution, or, for indels, S_del144 for single amino-acid mutations, or S_del143/145 for a multi-amino acid deletion. Multiple mutations can be entered by separating them with a comma. Multiple samples can be selected and will be distinguished by color on the plots. If more than one mutation is entered, each mutation is displayed as a separate facet on the plot.
+  
+  - **View Mutations:** Lists all mutations observed for the selected sample. If the *lineage.muts* option is defined, a column is added to the table that includes all lineages the mutation is associated with. If *write.all.targets* was set to TRUE in `call_mutations()`, all mutations in the *lineage.muts* file are included, even if no associated reads were observed (sequencing depths at underlying genomic positions are reported, while the reported observed frequency will be zero). 
+  
+  
+## Naming Conventions
+
+Amino acid substitutions are typically denoted as Gene_ReferenceAA-AAPosition-SampleAA (without the dashes). So, a change from a Glycine to Serine at amino acid position 224 of *MyGene* would be denoted *MyGene_G224S*. This notation is widely adopted. There seems to be less standardization around naming insertions and deletions. For example, a deletion of amino acid position 150 could be referred to as either *MyGene_del150*, *MyGene_150del*, or *MyGene_150-*. The default in MixviR is to use the first pattern, though the 2nd is also an option by setting *indel.format* to "Rev" in `call_mutations()`. If multiple amino acids are deleted, the range of deleted residues is specified in the form *MyGene_del150/152* (indicating deletion of positions 150, 151, and 152). These scenarios assume the deletion is in-frame (an even multiple of 3 nucleotide positions are deleted), and that the deletion begins with codon position 1 of the first amino acid affected. If the deletion is in-frame, but it begins at either the 2nd or 3rd codon position of the first amino acid, the numbering for the deletion begins with the first full codon deleted and extends to the last (partial) codon involved. In these scenarios, a new amino acid may be created when the the first and last affected codons are joined. Below is an example from the S gene of Sars-Cov2, in which 6 bases (AGTTCA) are deleted from positions 22029-22034 (beginning at codon position 2 of amino acid 156 of the S gene). The original sequence, broken into its codons and starting at position 22025, is below...
+
+Ref Sequence:             AGT GAG TTC AGA GTT
+Ref Amino Acids:           S   E   F   R   V
+Ref Amino Acid Position:  155 156 157 158 159
+
+The corresponding deleted sequence is...
+
+Deletion Sequence:      AGT GGA GTT
+Deletion Amino Acids:    S   G   V
+
+There is some ambiguity regarding how to name this event. It could be named S_del156/157, with a resulting substitution of R158G. Alternatively, it could be named S_del157/158 with a resulting substitution of E156G. As described above, MixviR numbers the deletion beginning with the amino acid corresponding to the first full codon deleted - in this case S_del157/158, and it currently does not call the substitution, as both the deletion and substitution represent just one mutational (evolutionary) event.
+
+If an out-of-frame insertion or deletion occurs, it is denoted with either Fdel or Fins (frameshift deletion or insertion, respectively), and the amino acid position within the gene where the indel begins is listed, along with the length in base pairs of the indel.
+
+Finally, for non-sense mutations resulting in a mutation to a premature stop codon, and asterisk is used (i.e. ORF1a_R718*).
+
+For the purpose of data visualization in the `explore_mutations()` Shiny dashboard, it's important that the mutation designations assigned by `call_mutations()` match those in the optional input files. If you're unsure, check the names in the ALT_ID column of *samp_mutations* against those in your files.
+
+## Cautions
+
+ - 1.) The min.alt.freq is set to 0.01 by default. It may be tempting to drop this to try to detect lineages at extremely low frequencies in a sample. This should be done with caution, as sequencing noise included in the vcf file can start to interfere with the translation of true amino acids in the sample. For example, say there's a codon at positions 100-102 that in the reference is CCC (amino acid P), and that the sample has a true mutation to ACC (amino acid T) at a frequency of 75%. Now imagine that at position 101 (the 2nd codon position) there is sequencing/PCR noise of C->G with frequency 0.0005 (0.05%). If the min.alt.freq threshold is less than 0.0005, both mutations will be considered in the translation, and the sample codon will be called AGC (amino acid S) instead of the actual ACC (amino acid T), and the frequencies of the two underlying SNPs (0.75, 0.0005) will be averaged to estimate the frequency of the (incorrect) mutation - see next point on this. Fortunately, sequencing and PCR noise, at least in our experience, typically occurs well below the 0.01 frequency, and this seems to be a reasonable default choice. While some minor adjusting to this value is probably safe if necessary, extreme values in either direction will likely lead to unreasonable/unreliable results.  
+ 
+ - 2.) Some amino acid substitutions have/require multiple underlying genomic mutations to their respective codon. In these cases, *MixviR* is expected to call the mutation correctly, but the relevant frequencies and associated sequencing depths are averaged to get the value that is reported. If you see a sequencing depth of something like 1245.5, that's probably why.
+ 
+ - 3.) It may be tempting to try to include mutation data for lots of closely-related lineages in the lineage/mutation (*lineage.muts*) file to try to distinguish among lineages at a very fine scale. One example of this in Sars-Cov2 is the Delta variant, which as of the time this vignette was written had >100 sublineages defined that were designated AY.1, AY.2, AY.3, etc... Note that any mutations that show up more than once in this file are removed for the analysis, and so including many closely-related lineages/groups will likely result in having few or no mutations to use for the analysis. The estimates of lineages present in the "Lineages Present" tab of the RShiny dashboard is very dependent on having mutations that are highly-informative/diagnostic for each lineage.
+
+## Example Data
+
+*MixviR* comes with a set of example data files that can be used to test out the program. These include vcf files representing Sars-Cov2 environmental samples obtained from a single location on three different dates, a lineage.muts file (example_lineage_muts.csv) containing a subset of four Sars-Cov2 variants to evaluate, and a location/dates file (example_location_date.csv).
+
+You can use the `system.file()` function to see the location of the raw files.
+
+## Example Analysis
+
+### Step 1: `call_mutations()`
+
+Your first step with *MixviR* will typically be to run the `call_mutations()` function, which identifies all the mutations in the input datasets (vcf files). We'll point this function to the directory storing the three example vcf files, and since these data are for Sars-Cov2, we can use the pre-formatted "Wuhan" reference. These two pieces of information (location of input files and reference info) are all that's required to make it run. In this case though, I'll also clean up the sample names by trimming off all the text after the "_" in each input file name with the *name.sep* option...
+
+```{r, eval = FALSE}
+call_mutations(sample.dir = "~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/inst/extdata/vcfs", 
+               reference = "Wuhan",
+               name.sep = "_")
+
+```
+
+Running this creates a new object named *samp_mutations*, which stores all the amino acid changes observed in each sample. In this case, there are a total of 237 mutations identified. The *samp_mutations* data frame looks like...
+
+![samp_mutations preview](~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/images/samp_mutations_example.png)
+
+Most of the columns here are fairly self-explanatory. Each mutation identified is listed in the "ALT_ID" column. "AF" gives the estimated frequency of that mutation in the sample, which is simply the "ALT_COUNT"/"DP". The "POS" column provides the genomic position of the mutation along the chromosome. By default, this data frame serves as input for the `explore_mutations()` function, which we'll run next.
+
+
+### Step 2: `explore_mutations()`
+
+Running the `explore_mutations()` function opens an RShiny dashboard in a separate window. The number of tabs available in the window depends on the number of options (if any) passed to the function.
+
+```{r}
+explore_mutations()
+```
+
+![Basic View Mutations Tab](~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/images/view_mutations_example.png)
+
+Here we have run `explore_mutations()` in its most basic form and got just a single tab named "View Mutations", which is just a slightly reformatted version of the *samp_mutations* data frame. There are options to select the sample you want to view (drop-down box in top left), and also to filter results by searching for specific text (i.e. a gene or mutation name). Each column is also sortable with the arrows at the top of the column (shift+click allows sorting by multiple columns).
+
+Now let try adding one option to `explore_mutations()`, passing it a location/dates file with the *dates* option...
+
+```{r}
+explore_mutations(dates = "~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/inst/extdata/example_location_date.csv")
+```
+
+This time we have three tabs available in the RShiny window: New Mutations, Mutations Frequencies, and View Mutations.
+
+
+The New Mutations tab allows you to select a date and view the set of mutations that were observed for the first time (across the entire dataset) on or after that date.
+
+![New Mutations Tab](~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/images/new_mutations_example.png)
+
+
+The Mutation Frequencies tab allows you to enter one or more mutation names (comma separated if more than one), and the frequencies of these mutations are plotted for each date available in the dataset for the selected location. Multiple mutations are plotted as separate facets, while multiple locations can also be selected and are distinguished by color on each facet.
+
+![Mutation Frequencies Tab](~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/images/mutation_frequencies_example.png)
+
+
+Providing a lineage/mutations file with the *lineage.muts* option in addition to a locations/dates file results in a fourth tab (and also some additional information included in the New Mutations and View Mutations tabs from above). The fourth tab is named "Lineages Present", and provides two plots...
+
+```{r}
+explore_mutations(dates = "~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/inst/extdata/example_location_date.csv", lineage.muts = "~/Desktop/MixviR_pipeline/MixviR/MixviR_v2.0/inst/extdata/example_lineage_muts.csv")
+```
+
+
+
+If a lineage/mutations file is provided with the *lineage.muts* options, an additional column is added to this file that lists each lineage the mutation is associated with.
+
+
+
+
+
+AT April 18, May 2, Aug 15 (may 2 has mixture of B.1.1.7 and P.1, delta on Aug 15; the B.1.1.7 is right at 50%, so can show threshold effect). Sample lables are either AT or 0PD00000
+
+
+### Basic Run
+
+We'll start with the simplest run, which won't include any of the information from the lineage/mutation or location/dates files. First we need to run `call_mutations()` to identify all the mutations in the three datasets. We'll point this function to the directory storing the vcf files, and since these data are for Sars-Cov2, we can use the pre-formatted "Wuhan" reference. These two pieces of information are all that's required to make it run. In this case though, I'll also clean up the sample names by trimming off all the text after the "_" in each one with the *name.sep* option...
+
+
