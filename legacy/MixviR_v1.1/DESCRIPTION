@@ -1,0 +1,25 @@
+Package: MixviR
+Title: Explore Viral Variation In Mixed Sample Short Read Sequence Data - Esp Sars-Cov2
+Version: 1.1.0.0000
+Authors@R: 
+    person(given = "Michael",
+           family = "Sovic",
+           role = c("aut", "cre"),
+           email = "sovic.1@osu.edu",
+           comment = c(ORCID = "0000-0002-8556-3704"))
+Description: Provides functions to explore, characterize, and visualize variation from mixed short-read DNA sequence samples. Originally created to help analyze Sars-Cov2 (Covid19) data from wastewater samples.
+License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
+    license
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports:
+    Biostrings,
+    dplyr,
+    ggplot2,
+    magrittr,
+    patchwork,
+    readr,
+    stringr,
+    tidyr
