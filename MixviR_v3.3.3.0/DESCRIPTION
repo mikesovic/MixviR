@@ -1,0 +1,37 @@
+Package: MixviR
+Title: Explore DNA/Amino Acid Variation and Infer Lineages in Mixed Genomic Microbial Samples Including SARS-CoV-2
+Version: 3.3.3.0000
+Authors@R: c(
+    person("Michael", "Sovic", role = c("aut", "ccp", "cre"), email = "sovic.1@osu.edu", comment = c(ORCID = "0000-0002-8556-3704")),
+    person("Francesca", "Savona", role = c("res")),
+    person("Zuzana", "Bohrerova", role = c("res", "fnd")),  
+    person("Seth", "Faith", role = c("ccp", "ctb"), comment = c(ORDIC = "0000-0002-0441-9859")))
+Author: Michael Sovic <sovic.1@osu.edu>
+Maintainer: Michael Sovic <sovic.1@osu.edu>
+Description: Explore DNA and amino acid variation and infer presence of specific lineages in short-read DNA sequence samples from a target group that potentially contain mixtures of variants/lineages. Originally created to help analyze environmental SARS-CoV-2 (Covid-19) samples from environmental sources such as wastewater or dust, but can be applied to any microbial group.
+License: GPL-3
+Encoding: UTF-8
+URL: https://github.com/mikesovic/MixviR
+BugReports: https://groups.google.com/g/mixvir
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports:
+    Biostrings,
+    dplyr,
+    DT,
+    ggplot2 (>= 3.1.0),
+    glue,
+    httr,
+    lubridate,
+    magrittr,
+    plotly (>= 4.9.4),
+    readr (>= 2.0.0),
+    roxygen2,
+    shiny,
+    stats (>= 1.4.0),
+    stringr (>= 1.1.0),
+    tidyr (>= 0.8.0),
+    usethis,
+    utils,
+    vcfR (>= 1.11.0)
