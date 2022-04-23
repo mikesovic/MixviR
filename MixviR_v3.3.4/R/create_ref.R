@@ -267,7 +267,7 @@ create_ref <- function(genome, feature.bed, code.num = "1") {
   } else {
     ref_plus <- data.frame("CHR" = character(),
                            "POS" = integer(),
-                           "REF_BASE",
+                           "REF_BASE" = character(),
                            "GENE" = character(),
                            "STRAND" = character(),
                            "REF_CODON" = character(), 
