@@ -1,7 +1,7 @@
 Package: MixviR
 Title: Explore DNA/Amino Acid Variation and Infer Lineages in Mixed
         Genomic Microbial Samples Including SARS-CoV-2
-Version: 3.3.4.0000
+Version: 3.3.4
 Authors@R: c(
     person("Michael", "Sovic", role = c("aut", "ccp", "cre"), email = "sovic.1@osu.edu", comment = c(ORCID = "0000-0002-8556-3704")),
     person("Francesca", "Savona", role = c("res")),
