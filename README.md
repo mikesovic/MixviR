@@ -1,13 +1,16 @@
 ## Summary
 
-*MixviR* is a tool to help analyze, explore, and visualize high-throughput genomic data from samples that may contain mixed lineages of a given microbial taxon. It was originally developed to analyze SARS-CoV-2 environmental (wastewater) samples, but can be applied to samples from any microbial taxon. It uses vcf-formatted input files along with reference genomic information to identify genetic variants (both at the DNA and amino acid level), and if provided optional input information about lineage-characteristic mutations, can estimate frequencies of target lineages within samples. 
+*MixviR* is an R package designed to help analyze, explore, and visualize high-throughput genomic data from samples that may contain mixed lineages of a given microbial taxon. It 
+was originally developed to analyze SARS-CoV-2 environmental (wastewater) samples, but can be applied to samples from any microbial taxon. It uses vcf-formatted input files along with reference genomic information to identify genetic variants (both at the DNA and amino acid level), and if provided optional input information about lineage-characteristic mutations, can estimate frequencies of target lineages within samples. 
 
 ## Installation
 
-*MixviR* is currently available at https://github.com/mikesovic/MixviR and can be installed with...
-devtools::install_github("mikesovic/MixviR/MixviR_X.Y.Z"), after replacing X.Y.Z with the current version.
+### GitHub
+devtools::install_github("mikesovic/MixviR/MixviR_X.Y.Z")
 
-It has also recently been submitted to CRAN, and once available there, it will be able to be installed with...
+### CRAN
+
+*MixviR* was recently submitted to CRAN. Once available there, it will be able to be installed with...
 install.packages("MixviR")
 
 ## Usage
