@@ -1,0 +1,31 @@
+Package: MixviR
+Title: Explore DNA/Amino Acid Variation in Short Read Sequence Data from Mixed Microbial Samples Including SARS-CoV-2
+Version: 3.3.2.0000
+Authors@R: c(
+    person("Michael", "Sovic", role = c("aut", "cre"), email = "sovic.1@osu.edu", comment = c(ORCID = "0000-0002-8556-3704")),
+    person("Seth", "Faith", role = c("ctb")))
+Author: Michael Sovic <sovic.1@osu.edu>
+Maintainer: Michael Sovic <sovic.1@osu.edu>
+Description: Explore, characterize, and visualize DNA and amino acid variation from short-read DNA sequence samples from a target group that potentially contain mixtures of variants/lineages. Originally created to help analyze environmental SARS-CoV-2 (Covid-19) samples from environmental sources such as wastewater or dust, but can be applied to any microbial group.
+License: LGPL (>= 3)
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports:
+    Biostrings,
+    dplyr,
+    DT,
+    ggplot2,
+    glue,
+    lubridate,
+    magrittr,
+    plotly,
+    RColorBrewer,
+    readr,
+    shiny,
+    stats,
+    stringr,
+    tidyr,
+    utils,
+    vcfR
