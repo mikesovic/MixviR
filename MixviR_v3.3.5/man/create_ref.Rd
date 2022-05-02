@@ -4,7 +4,7 @@
 \alias{create_ref}
 \title{Create MixVir-formatted reference genome object}
 \usage{
-create_ref(genome, feature.bed, code.num = "1")
+create_ref(genome, feature.bed, code.num = "1", removed.genes = NULL)
 }
 \arguments{
 \item{genome}{\emph{(Required)} Path to fasta formatted genome file}
@@ -12,6 +12,8 @@ create_ref(genome, feature.bed, code.num = "1")
 \item{feature.bed}{\emph{(Required)} Path to bed file defining features of interest (open reading frames to translate). Tab delimited with 6 columns (without column names):"chr", "start", "end", "feature_name", "score" (not used), and "strand".}
 
 \item{code.num}{Number (character) associated with the genetic code to be used for translation. Details can be found at https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi.}
+
+\item{removed.genes}{Character providing path/name of tab-separated file that will be written that stores names of genes (if any) in the feature.bed file that were removed because they didn't have an allowed size (not even multiples of 3). If NULL (default), file is not written.}
 }
 \value{
 A data frame with columns CHR,POS,REF_BASE,GENE,STRAND,REF_CODON,REF_AA,GENE_AA_POS,REF_IDENT,GENE_BASE_NUM,CODON_POSITION
