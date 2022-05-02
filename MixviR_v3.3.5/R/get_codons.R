@@ -4,6 +4,7 @@
 #' @param gene.seq Character vector containing gene sequence. The length of this vector should be equal to the length of sequence.
 #' @param rev Logical indicating whether the reverse complement of the gene.seq should be used.
 #' @keywords codons
+#' @return A character vector containing translated amino acids associated with each nucleotide position in the input vector.  
 #' @importFrom magrittr %>%
 #' @export
 #' @examples
