@@ -1,69 +1,3 @@
-#' Convert VCF Samples to MixviR Input Format
-#'
-#' Create csv files with relevant contents of VCF to use as input for MixviR. Only necessary for early versions of MixviR.
-#' 
-#' @param vcf.dir path to directory containing one or more vcf files that will be converted to csv input format for MixviR call_mutations(). VCF's need to contain "DP" and "AD" flags in the FORMAT field. This directory should not contain any other files.
-#' @param csv.path Path to directory where csv files will be written.
-#' @param max.vcf.size Max memory usage (in bytes) allowed when reading in vcf file (from vcfR). 
-#' @keywords VCF
-#' @importFrom magrittr %>%
-#' @export
-#' @return csv file(s) with cols "CHR"	"POS"	"REF"	"ALT"	"DP"	"REF_COUNT" ALT_COUNT". Written to path defined with 'csv.path'.
-
-bulk_vcf_to_mixvir <- function(vcf.dir = NULL, csv.path = NULL,
-                               max.vcf.size = 1e+08){
-  
-    vcf_names <- dir(vcf.dir)
-    
-    for (infile in vcf_names) {
-      
-      vcf.dir <- gsub("/$", "", vcf.dir)
-      
-      #read in vcf
-      vcf_obj <- vcfR::read.vcfR(paste0(vcf.dir, "/", infile), 
-                                 limit = max.vcf.size,
-                                 verbose = FALSE)
-      
-      #get df with total depths at each position
-      depths <- vcfR::extract.gt(vcf_obj, "DP", as.numeric = TRUE) %>%
-        as.data.frame()
-      names(depths) <- c("DP")
-      
-      #get df with depths of each allele
-      allele_depths <- vcfR::extract.gt(vcf_obj, "AD") %>%
-        as.data.frame()
-      names(allele_depths) <- c("ALLELE_COUNTS")
-      allele_depths <- allele_depths %>%
-        dplyr::mutate("ALLELE_COUNTS" = as.character(ALLELE_COUNTS)) %>%
-        tidyr::separate(col = ALLELE_COUNTS,
-                        into = c("REF_COUNT", "ALT_COUNT"),
-                        sep = ",",
-                        fill = "right") %>%
-        dplyr::mutate("REF_COUNT" = as.integer(REF_COUNT)) %>%
-        dplyr::mutate("ALT_COUNT" = as.integer(ALT_COUNT))
-      allele_depths$ALT_COUNT <- tidyr::replace_na(allele_depths$ALT_COUNT, 0)
-      
-      
-      #read in the data part of the vcf as a data frame
-      consensus <- readr::read_tsv(paste0(vcf.dir, "/", infile),
-                                   show_col_types = FALSE,
-                                   comment = "##") %>%
-        dplyr::select('#CHROM', POS, REF, ALT) %>%
-        dplyr::rename("CHR" = '#CHROM')
-      
-      #add in the total depths/allele depths - this gives the original "consensus" format for MixviR
-      consensus <- cbind(consensus, depths, allele_depths)
-      
-      csv.path <- gsub("/$", "", csv.path)
-      infile <- gsub(".vcf.gz$", "", infile)
-      infile <- gsub(".vcf$", "", infile)
-      write.table(consensus, file = paste0(csv.path, "/", infile, ".csv"),
-                  sep = ",", col.names = TRUE, row.names = FALSE, quote = FALSE)
-    
-    }
-  }
-
-  
 #' Convert Sample VCF to MixviR Input Format
 #'
 #' Create data frame with relevant contents of VCF
@@ -982,7 +916,7 @@ call_mutations <- function(sample.dir = NULL,
       return(NULL)
     } else {
       ref_no_dp <- readr::read_tsv("https://raw.githubusercontent.com/mikesovic/MixviR/main/reference_files/wuhan.tsv", show_col_types = FALSE)
-      print("Using Wuhan reference")
+      message("Using Wuhan reference")
     }
   } else {
     ref_no_dp <- create_ref(genome = fasta.genome, feature.bed = bed, code.num = genetic.code.num)
@@ -1024,7 +958,7 @@ call_mutations <- function(sample.dir = NULL,
     
     
     all_variants_temp <- data.frame()
-    print(paste0("Calling mutations: ", curr_samp))
+    message(paste0("Calling mutations: ", curr_samp))
     
     sample_variants <- variants_df %>%
       dplyr::filter(ALT != '.') %>%
