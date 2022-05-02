@@ -4,6 +4,7 @@
 #' @param genome *(Required)* Path to fasta formatted genome file
 #' @param feature.bed *(Required)* Path to bed file defining features of interest (open reading frames to translate). Tab delimited with 6 columns (without column names):"chr", "start", "end", "feature_name", "score" (not used), and "strand".
 #' @param code.num Number (character) associated with the genetic code to be used for translation. Details can be found at https://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi.
+#' @param removed.genes Character providing path/name of tab-separated file that will be written that stores names of genes (if any) in the feature.bed file that were removed because they didn't have an allowed size (not even multiples of 3). If NULL (default), file is not written.
 #' @keywords reference
 #' @importFrom magrittr %>%
 #' @export
@@ -22,7 +23,7 @@
 #'  code.num = "1")
 #' }
 
-create_ref <- function(genome, feature.bed, code.num = "1") {
+create_ref <- function(genome, feature.bed, code.num = "1", removed.genes = NULL) {
 
   features <- readr::read_tsv(feature.bed, col_names = FALSE)
   names(features) <- c("chrm", "start", "end", "GENE", "score", "strand")
@@ -30,8 +31,10 @@ create_ref <- function(genome, feature.bed, code.num = "1") {
   removed <- features %>% 
     dplyr::filter(((end-start+1) %% 3) != 0)
   
-  if (nrow(removed) > 0) {
-    write.table(removed, file = "genes_removed.bed", sep = "\t", quote = FALSE, col.names = TRUE, row.names = FALSE)
+  if (!is.null(removed.genes)) {
+   if (nrow(removed) > 0) {
+     write.table(removed, file = removed.genes, sep = "\t", quote = FALSE, col.names = TRUE, row.names = FALSE)
+   }
   }
   
   features <- features %>% 
