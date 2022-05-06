@@ -1,0 +1,13 @@
+Sample,Lineage,Type,Scaled Proportion Mean
+ERR221660,EAI,Expected,0.9
+ERR221660,CAS,Expected,0.1
+ERR221662,CAS,Expected,0.7
+ERR221662,EAI,Expected,0.3
+ERR221663,EAI,Expected,0.7
+ERR221663,CAS,Expected,0.3
+ERR221664,CAS,Expected,0.95
+ERR221664,EAI,Expected,0.05
+ERR221665,CAS,Expected,0.9
+ERR221665,EAI,Expected,0.1
+ERR221666,EAI,Expected,0.95
+ERR221666,CAS,Expected,0.05
