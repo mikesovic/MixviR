@@ -1,0 +1,18 @@
+Sample,Lineage,Type,Scaled Proportion Mean
+Mixture 1,BA.1,Expected,0.340328467
+Mixture 1,Alpha,Expected,0.659671533
+Mixture 2,Delta,Expected,0.190222501
+Mixture 2,BA.2,Expected,0.809777499
+Mixture 3,Alpha,Expected,0.110601193
+Mixture 3,BA.2,Expected,0.889398807
+Mixture 4,Delta,Expected,0.042232198
+Mixture 4,Alpha,Expected,0.957767802
+Mixture 5,Delta,Expected,0.032143614
+Mixture 5,BA.1,Expected,0.967856386
+Mixture 6,Alpha,Expected,0.365890688
+Mixture 6,Delta,Expected,0.307186235
+Mixture 6,BA.2,Expected,0.326923077
+Mixture 7,Alpha,Expected,0.307790549
+Mixture 7,Delta,Expected,0.258407833
+Mixture 7,BA.1,Expected,0.158790975
+Mixture 7,BA.2,Expected,0.275010643
