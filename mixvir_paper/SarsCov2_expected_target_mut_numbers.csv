@@ -1,0 +1,18 @@
+Sample,Lineage,Targets,Value
+Mixture 1,BA.1,Total,14
+Mixture 1,Alpha,Total,13
+Mixture 2,Delta,Total,22
+Mixture 2,BA.2,Total,20
+Mixture 3,Alpha,Total,13
+Mixture 3,BA.2,Total,20
+Mixture 4,Delta,Total,22
+Mixture 4,Alpha,Total,13
+Mixture 5,Delta,Total,22
+Mixture 5,BA.1,Total,14
+Mixture 6,Alpha,Total,13
+Mixture 6,Delta,Total,22
+Mixture 6,BA.2,Total,20
+Mixture 7,Alpha,Total,13
+Mixture 7,Delta,Total,22
+Mixture 7,BA.1,Total,14
+Mixture 7,BA.2,Total,20
