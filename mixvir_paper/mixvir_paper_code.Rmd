@@ -1,15 +1,34 @@
 ---
 title: "MixviR_Paper_Analyses"
 author: "Mike Sovic"
-date: "5/6/2022"
+date: "8/11/2022"
 output: 
   html_document:
     toc: true
 ---
 
-Below is code associated with analyses in the paper describing MixviR. Note that in some cases infiles will need to be downloaded and paths updated prior to running the code. 
+```{r}
+knitr::opts_chunk$set(message = FALSE,
+                      warning = FALSE)
+```
 
-# R Setup
+This document contains code associated with analyses in the paper describing MixviR (updated 8/11/22 in response to reviewer comments). The code is generalized, so paths to files will need to be updated to replicate analyses.  
+
+The validation analyses involve two datasets - one with mixtures of SARS-CoV-2, and another with mixture samples from *M. tuberculosis*. Both datasets are available from NCBI's short read archive (SRA). fastq files were downloaded from SRA with the SRA Import app in Basespace. 
+
+# Primary Manuscript Analyses
+
+## Alignment/Variant Calling
+
+### SARS-CoV-2 
+
+Alignment and variant calling for the SARS-CoV-2 samples were performed with the DRAGEN Covid Lineage App v3.5.10 in Basespace using the primer bed file associated with Artic v4 primers and the callability and coverage thresholds to 1. Default settings were otherwise used. Resulting vcf files were obtained and used as input for MixviR analyses.
+
+### M. tuberculosis
+
+Alignment and variant calling for the *M. tuberculosis* samples were performed with the DRAGEN Somatic App v4.0.3 in Basespace. Alignments were performed against the reference ??? after cleaning reference chromosome names for compatibility with MixviR. Variant calling was performed by turning off filtering of multiallelic variants, setting --vc-enable-unequal-ntd-errors to false, and setting Somatic Hotspots to 'None'. Resulting vcf files were obtained and used as input for MixviR analyses.
+
+## Load R Packages
 
 ```{r, warning=FALSE, message=FALSE}
 library(MixviR)
@@ -18,373 +37,372 @@ library(patchwork)
 library(magrittr)
 ```
 
-# SARS-CoV-2 Validation
+## Summarize Coverages For Each Dataset
 
-## Generate VCF Files
+Get estimates of coverage per position for each dataset.
 
-### Raw Data
+### SARS-CoV-2
 
-Raw data files (fastq; N=7 mixtures) are available from NCBI's short read archive (SRA), Bioproject accession PRJNA827817. 
+```{r}
+#These values come from the Basespace report_metrics.json file generated as part of the DRAGEN Covid Lineages anlysis - they are median coverages.
 
-### Alignment
+sars_coverage <- data.frame("Sample" = c("SRR18962157", "SRR18962947", "SRR18961847", "SRR18961947", "SRR18939817", "SRR18936975", "SRR18962138"),
+                            "Sample_coverage" = c(5070, 4699, 5195, 5047, 5225, 4845, 4688))
 
-Alignments of each file were performed with Illumina's Dragen Somatic app using the Wuhan reference to generate bams.
+sars_coverage <- sars_coverage %>%
+  pull(Sample_coverage) %>%
+  mean()
 
-### Variant Calling (bcftools)
-
-VCF files were generated with bcftools per the code below and added to dir "./covid_validation/vcfs/".
-
-```{bash, eval = FALSE}
-#for each bam file...
-bcftools-1.11/bcftools mpileup -f <FASTA REFERENCE> -d 4000 -q 60 -Q 30 -L 4500 --ff UNMAP,SECONDARY,QCFAIL -a FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,INFO/AD,INFO/ADF,INFO/ADR <INPUT BAM> | bcftools-1.11/bcftools call -m -A -Ov -o vcfs/<OUT>_temp.vcf
-
-bcftools-1.11/bcftools norm vcfs/<OUT>_temp.vcf -c w -f <FASTA REFERENCE> -m -both -Ov -o <OUT>.vcf
+sars_coverage
 ```
 
-## MixviR Analysis
+### M. tuberculosis
+
+```{r}
+#These values come from the Basespace report associated with the mapping performed as part of the DRAGEN Somatic analysis.
+
+mtub_coverage <- data.frame("Sample" = c("ERR221660", "ERR221662", "ERR221663", "ERR221664", "ERR221665", "ERR221666"),
+                            "mapped_bases" = c(973483800, 814497000, 843343500, 769179600, 697562200, 721993700))
+
+mtub_genome_size <- 4411532
+
+mtub_coverage <- mtub_coverage %>%
+  mutate("Sample_coverage" = mapped_bases/mtub_genome_size) %>%
+  pull(Sample_coverage) %>%
+  mean()
+
+mtub_coverage
+```
+
+The full datasets have relatively high depths overall, with coverages for the SARS-CoV-2 dataset >5000x and the *M.tuberculosis* dataset in the range of ~150-200x.
+
+## Prep Additional Files for MixviR Validation Analyses
+
+### SARS-CoV-2
+
+#### Mutation File
+
+Mutation tables associated with SARS-CoV-2 lineages/variants were downloaded from outbreak.org on Feb 17, 2022 and combined into a "lineage.muts" file for MixviR. This file is available from https://github.com/mikesovic/MixviR/tree/main/mutation_files and also from https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/SarsCov2_lineage_muts.csv 
+
+### M. tuberculosis
+
+#### Mutation File
+
+Mutations associated with lineages designated "L1" and "L3" (corresponding to lineages EAI6-BGD1 and CAS1-Kili, respectively) were obtained from Table S3 of Merker et al (2020) to generate the "lineage.muts" file for MixviR. It is available from "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv".
+
+
+#### Prep bed File
+
+```{bash, eval = FALSE}
+curl -L -o mtub.gff.gz https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/195/955/GCF_000195955.2_ASM19595v2/GCF_000195955.2_ASM19595v2_genomic.gff.gz
+gunzip mtub.gff.gz
+
+grep -v -E "^#" mtub.gff | \
+awk 'BEGIN {OFS="\t"} $3=="gene" {print $1,$4,$5,$6,$7,$9}' | \
+sed -E 's/(ID=.+Name=)(.+)(;experiment.+)/\2/' | \
+sed -E 's/(ID=.+Name=)(.+)(;gbkey.+)/\2/' | \
+awk 'BEGIN {OFS="\t"} {print $1,$2,$3,$6,$4,$5}' > mixvir_mtub.bed
+```
+
+#### Clean Up Reference Chromosome Names
+
+```{bash, eval = FALSE}
+sed -E 's/[[:space:]].*$//' mtub.fa > mtub_clean.fa
+```
+
+
+# MixviR Analyses
+
+## Functions
+
+```{r}
+mut_count_plot <- function(dataset, coverage, fig.num){
+  
+  mut_count_total <- readr::read_csv(paste0("dragen_runs/", dataset, "/", coverage, "/estimated_proportions.csv")) %>%
+    dplyr::select(Sample, Lineage, Num_Target_Muts) %>%
+    dplyr::mutate("Class" = "Total")
+
+  mut_count_observed <- readr::read_csv(paste0("dragen_runs/", dataset, "/", coverage, "/estimated_proportions.csv")) %>%
+    dplyr::select(Sample, Lineage, Num_Target_Muts, Proportion_Present) %>%
+    dplyr::mutate("Class" = "Observed",
+                  "Num_Target_Muts" = Num_Target_Muts*Proportion_Present) %>%
+    dplyr::select(Sample, Lineage, Num_Target_Muts, Class)
+
+  mut_count_results <- dplyr::bind_rows(mut_count_total, mut_count_observed) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18936975.hard-filtered.vcf.gz", "Mixture 1")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18939817.hard-filtered.vcf.gz", "Mixture 2")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18961947.hard-filtered.vcf.gz", "Mixture 3")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18961847.hard-filtered.vcf.gz", "Mixture 4")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962157.hard-filtered.vcf.gz", "Mixture 5")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962947.hard-filtered.vcf.gz", "Mixture 6")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962138.hard-filtered.vcf.gz", "Mixture 7")) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "Omicron_", "")) %>% 
+    dplyr::mutate("Class" = factor(Class, levels = c("Total", "Observed"))) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L1 \\(EAI\\)", "EAI")) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L3 \\(CAS\\)", "CAS")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, ".hard-filtered.vcf.gz", ""))
+    
+  if (dataset == "SARS-CoV-2") {
+    mut_count_results <- mut_count_results %>%
+       dplyr::filter((Sample == "Mixture 1" & Lineage %in% c("Alpha", "BA.1")) | 
+                     (Sample == "Mixture 2" & Lineage %in% c("BA.2", "Delta")) |
+                     (Sample == "Mixture 3" & Lineage %in% c("Alpha", "BA.2")) |
+                     (Sample == "Mixture 4" & Lineage %in% c("Alpha", "Delta")) |
+                     (Sample == "Mixture 5" & Lineage %in% c("Delta", "BA.1")) |
+                     (Sample == "Mixture 6" & Lineage %in% c("Alpha", "BA.2", "Delta")) |
+                     (Sample == "Mixture 7" & Lineage %in% c("Alpha", "BA.1", "BA.2", "Delta")))
+  }
+  
+  if (dataset == "SARS-CoV-2") {
+    mut_count_plot <- ggplot2::ggplot(mut_count_results, ggplot2::aes(x = Lineage, y = Num_Target_Muts, fill = Class)) +
+                      ggplot2::geom_bar(stat = "identity", position = "dodge") +
+                      ggplot2::scale_fill_brewer(palette = "Paired") +
+                      ggplot2::facet_wrap(ggplot2::vars(Sample), scales = "free") +
+                      ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+                      ggplot2::labs(y = "Number Of Target Mutations",
+                                    title = paste0("MixviR Validation: ", dataset, " Mixtures"),
+                                    subtitle = "Lineage-Characteristic Mutations Detected") + 
+                      ggplot2::theme(legend.direction = "horizontal", 
+                                     legend.position = c(0.86, 0.08), 
+                                     legend.justification = c(1, 0),
+                                     legend.key.size = ggplot2::unit(0.7, 'cm'),
+                                     legend.title = ggplot2::element_blank(),
+                                     legend.text = ggplot2::element_text(size = 7),
+                                     strip.text = ggplot2::element_text(size = 9),
+                                     axis.text = ggplot2::element_text(size = 7),
+                                     title = ggplot2::element_text(size = 11),
+                                     axis.title = ggplot2::element_text(size = 9))
+  } else {
+  
+    mut_count_plot <- ggplot2::ggplot(mut_count_results, ggplot2::aes(x = Lineage, y = Num_Target_Muts, fill = Class)) +
+                      ggplot2::geom_bar(stat = "identity", position = "dodge") +
+                      ggplot2::scale_fill_brewer(palette = "Paired") +
+                      ggplot2::facet_wrap(ggplot2::vars(Sample), scales = "free") +
+                      ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+                      #ggplot2::ggtitle("Target Mutations Identified From Mixtures of M. tuberculosis Lineages") +
+                      ggplot2::labs(y = "Number Of Target Mutations",
+                                    title = expression(paste("MixviR Validation: ", italic("M. tuberculosis"), " Mixtures")),
+                                    subtitle = "Lineage-Characteristic Mutations Detected") + 
+                      ggplot2::theme(legend.title = ggplot2::element_blank(),
+                                     legend.text = ggplot2::element_text(size = 7),
+                                     strip.text = ggplot2::element_text(size = 9),
+                                     axis.text = ggplot2::element_text(size = 7),
+                                     title = ggplot2::element_text(size = 11),
+                                    axis.title = ggplot2::element_text(size = 9)) +
+                      scale_y_continuous(breaks = c(2,4,6,8,10), labels = c(2,4,6,8,10))
+      
+  }
+  
+ggplot2::ggsave(filename = paste0("dragen_runs/", dataset, "/", coverage, "/Figure_", fig.num, ".tiff"), 
+                plot = mut_count_plot, 
+                dpi = 300)
+  
+mut_count_plot
+} 
+  
+  
+lin_prop_plot <- function(dataset, coverage, fig.num) {
+  
+ if (dataset == "SARS-CoV-2") {
+  prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/SarsCov2_expected_lineage_proportions.csv")
+ } else {
+  prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_expected_lineage_proportions.csv")
+}
+  
+ prop_expected <- prop_expected %>%
+   dplyr::rename("Sample Proportion" = "Scaled Proportion Mean")
+ 
+ prop_observed <- readr::read_csv(paste0("dragen_runs/", dataset, "/", coverage, "/estimated_proportions.csv"))
+ 
+ prop_observed <- prop_observed %>%
+    dplyr::filter(Proportion_Present >= 0.5)
+ 
+ prop_observed <- prop_observed %>%
+    dplyr::rename("Sample Proportion" = "Mean_Freq") %>%
+    dplyr::mutate("Type" = "MixviR Estimate") %>%
+    dplyr::select(Sample, Lineage, Type, `Sample Proportion`) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18936975.hard-filtered.vcf.gz", "Mixture 1")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18939817.hard-filtered.vcf.gz", "Mixture 2")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18961947.hard-filtered.vcf.gz", "Mixture 3")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18961847.hard-filtered.vcf.gz", "Mixture 4")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962157.hard-filtered.vcf.gz", "Mixture 5")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962947.hard-filtered.vcf.gz", "Mixture 6")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962138.hard-filtered.vcf.gz", "Mixture 7")) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "Omicron_", "")) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L1 \\(EAI\\)", "EAI")) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L3 \\(CAS\\)", "CAS")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, ".hard-filtered.vcf.gz", ""))
+    
+ results_prop <- dplyr::bind_rows(prop_expected, prop_observed)
+ 
+ if (dataset == "SARS-CoV-2") {
+   lin_prop_plot <- ggplot2::ggplot(results_prop, ggplot2::aes(x = Type, y = `Sample Proportion`, fill = Lineage)) +
+    ggplot2::geom_bar(stat = "identity", position = "stack") +
+    ggplot2::scale_fill_brewer(palette = "Paired") +
+    ggplot2::facet_wrap(ggplot2::vars(Sample)) +
+    ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+    ggplot2::labs(y = "Proportion In Sample",
+                  title = "",
+                  subtitle = "Estimates Of Lineage Proportions") +
+    ggplot2::theme(legend.direction = "horizontal", 
+                   legend.position = c(0.98, 0.08), 
+                  legend.justification = c(1, 0),
+                  legend.key.size = ggplot2::unit(0.7, 'cm'),
+                  legend.title = ggplot2::element_blank(),
+                  legend.text = ggplot2::element_text(size = 6),
+                  strip.text = ggplot2::element_text(size = 9),
+                  axis.text = ggplot2::element_text(size = 7),
+                  title = ggplot2::element_text(size = 11),
+                  axis.title = ggplot2::element_text(size = 9)) +
+    ggplot2::scale_x_discrete(labels= c("Expected", "MixviR\nEstimate"))
+ } else {
+   lin_prop_plot <- ggplot2::ggplot(results_prop, ggplot2::aes(x = Type, y = `Sample Proportion`, fill = Lineage)) +
+                          ggplot2::geom_bar(stat = "identity", position = "stack") +
+                          ggplot2::scale_fill_brewer(palette = "Paired") +
+                          ggplot2::facet_wrap(ggplot2::vars(Sample)) +
+                          ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+                          ggplot2::labs(y = "Proportion In Sample",
+                                        title = "",
+                                        subtitle = "Estimates Of Lineage Proportions") +
+                          ggplot2::theme(legend.title = ggplot2::element_blank(),
+                                         legend.text = ggplot2::element_text(size = 7),
+                                         strip.text = ggplot2::element_text(size = 9),
+                                         axis.text = ggplot2::element_text(size = 7),
+                                         title = ggplot2::element_text(size = 11),
+                                        axis.title = ggplot2::element_text(size = 9)) +
+                          ggplot2::scale_x_discrete(labels= c("Expected", "MixviR\nEstimate"))
+   
+ }
+ 
+ ggplot2::ggsave(filename = paste0("dragen_runs/", dataset, "/", coverage, "/Figure_", fig.num, ".tiff"), 
+                plot = lin_prop_plot, 
+                dpi = 300)
+  
+ lin_prop_plot
+}
+```
+
+
+
+## SARS-CoV-2 - Full Dataset
 
 ### `call_mutations()`
-```{r}
-samp_muts <- call_mutations(sample.dir = "./covid_validation/vcfs/", 
-                            reference = "Wuhan")
 
+```{r, eval = FALSE}
+call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/full/vcfs/",
+                   reference = "Wuhan",
+                   write.mut.table = TRUE,
+                   outfile.name = "dragen_runs/SARS-CoV-2/full/covid_samp_mutations.tsv")
 ```
 
 ### `estimate_lineages()`
 
+```{r, results='hide'}
+estimate_lineages(read.muts.from = "dragen_runs/SARS-CoV-2/full/covid_samp_mutations.tsv",
+                      lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20220217.csv",
+                  outfile.name = "dragen_runs/SARS-CoV-2/full/estimated_proportions.csv")
+```
+
+### Mutation Counts Plot
+
 ```{r}
-lin.table <- estimate_lineages(muts.df = samp_muts,
-                  lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20220217.csv",
-                  outfile.name = "./covid_validation/estimated_proportions.csv")
-
+sars_mut_count_plot_full <- mut_count_plot(dataset = "SARS-CoV-2", coverage = "full", fig.num = "2A")
 ```
 
-## Generate Plots
+### Lineage Proportions Plot
 
-### Target Mutation Proportions Plot (2A)
-
-```{r, warning=FALSE, message=FALSE}
-
-#combine results for number of mutations observed from "estimated_proportions.csv" with expected data in "SarsCov2_expected_target_mut_numbers.csv" 
-
-covid_mut_prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/SarsCov2_expected_target_mut_numbers.csv")
-
-covid_mut_prop_observed <- readr::read_csv("./covid_validation/estimated_proportions.csv") %>%
-  dplyr::rename("Value" = "Num_Target_Muts") %>%
-  dplyr::mutate("Targets" = "Detected") %>%
-  dplyr::select(Sample, Lineage, Targets, Value) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix1.vcf", "Mixture 1")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix2.vcf", "Mixture 2")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix3.vcf", "Mixture 3")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix4.vcf", "Mixture 4")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix5.vcf", "Mixture 5")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix6.vcf", "Mixture 6")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix7.vcf", "Mixture 7")) %>%
-  dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "Omicron_", ""))
-
-covid_mut_prop_results <- dplyr::bind_rows(covid_mut_prop_expected, covid_mut_prop_observed) %>%
-  dplyr::mutate("Targets" = factor(Targets, levels = c("Total", "Detected")))
-
-covid_mut_prop_plot <- ggplot2::ggplot(covid_mut_prop_results, ggplot2::aes(x = Lineage, y = Value, fill = Targets)) +
-  ggplot2::geom_bar(stat = "identity", position = "dodge") +
-  ggplot2::scale_fill_brewer(palette = "Paired") +
-  ggplot2::facet_wrap(ggplot2::vars(Sample), scales = "free") +
-  ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
-  ggplot2::ggtitle("Target Mutations Identified From Mixtures of Sars-Cov-2 Lineages") +
-  ggplot2::labs(y = "Number Of Target Mutations",
-                title = "MixviR Validation: Sars-Cov-2 Mixtures",
-                subtitle = "Lineage-Characteristic Mutations Detected") + 
-  ggplot2::theme(legend.direction = "horizontal", 
-                 legend.position = c(0.86, 0.08), 
-                 legend.justification = c(1, 0),
-                 legend.key.size = ggplot2::unit(0.7, 'cm'),
-                 legend.title = ggplot2::element_blank(),
-                 legend.text = ggplot2::element_text(size = 12),
-                 strip.text = ggplot2::element_text(size = 12),
-                 axis.text = ggplot2::element_text(size = 11),
-                 title = ggplot2::element_text(size = 15))
-
-ggplot2::ggsave(filename = "./Figure_2A.tiff", dpi = 600)
-```
-
-### Lineage Proportions Plot (2B)
-
-```{r, warning=FALSE, message=FALSE}
-
-#combine results for estimates of lineage proportions observed from "estimated_proportions.csv" with expected data in "SarsCov2_expected_lineage_proportions.csv" 
-
-covid_prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/SarsCov2_expected_lineage_proportions.csv")
-
-covid_prop_observed <- readr::read_csv("./covid_validation/estimated_proportions.csv") %>%
-  dplyr::rename("Scaled Proportion Mean" = "Mean_Freq") %>%
-  dplyr::mutate("Type" = "MixviR Estimate") %>%
-  dplyr::select(Sample, Lineage, Type, `Scaled Proportion Mean`) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix1.vcf", "Mixture 1")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix2.vcf", "Mixture 2")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix3.vcf", "Mixture 3")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix4.vcf", "Mixture 4")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix5.vcf", "Mixture 5")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix6.vcf", "Mixture 6")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "Mix7.vcf", "Mixture 7")) %>%
-  dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "Omicron_", ""))
-
-covid_results_prop <- dplyr::bind_rows(covid_prop_expected, covid_prop_observed)
-
-covid_lin_prop_plot <- ggplot2::ggplot(covid_results_prop, ggplot2::aes(x = Type, y = `Scaled Proportion Mean`, fill = Lineage)) +
-  ggplot2::geom_bar(stat = "identity", position = "stack") +
-  ggplot2::scale_fill_brewer(palette = "Paired") +
-  ggplot2::facet_wrap(ggplot2::vars(Sample)) +
-  ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
-  ggplot2::labs(y = "Proportion In Sample",
-                title = "",
-                subtitle = "Estimates Of Lineage Proportions") +
-  ggplot2::theme(legend.direction = "horizontal", 
-                 legend.position = c(0.95, 0.08), 
-                legend.justification = c(1, 0),
-                legend.key.size = ggplot2::unit(0.7, 'cm'),
-                legend.title = ggplot2::element_blank(),
-                legend.text = ggplot2::element_text(size = 12),
-                strip.text = ggplot2::element_text(size = 12),
-                axis.text = ggplot2::element_text(size = 11),
-                title = ggplot2::element_text(size = 15)) +
-  ggplot2::scale_x_discrete(labels= c("Expected", "MixviR\nEstimate"))
-
-ggplot2::ggsave(filename = "./Figure_2B.tiff", dpi = 600)
-
+```{r}
+sars_lin_prop_plot_full <- lin_prop_plot(dataset = "SARS-CoV-2", coverage = "full", fig.num = "2B")
 ```
 
 
 ### Combine SARS-CoV-2 Plots (Fig 2)
 
-```{r, fig.width=10}
-sars_plot <- covid_mut_prop_plot + plot_spacer() + covid_lin_prop_plot + 
-  plot_layout(widths = c(4.4, 0.2 ,4.4))
-sars_plot
-grid::grid.text("B", x = 0.96, y = 0.06, gp = grid::gpar(fontsize = 20, family = "Times", fontface = "bold"))
-grid::grid.text("A", x = 0.46, y = 0.06, gp = grid::gpar(fontsize = 20, family = "Times", fontface = "bold"))
+```{r, fig.width=11}
+sars_plot_full <- sars_mut_count_plot_full + plot_spacer() + sars_lin_prop_plot_full + 
+  plot_layout(widths = c(4.45, 0.1 ,4.45)) + 
+  plot_annotation(tag_levels = 'A')
+  #plot_annotation(caption = "Figure 2. SARS-CoV-2 validation analysis with seven standards, each consisting of known mixtures of two to four of the SARS-CoV-2 lineages Alpha, Delta, Omicron BA.1,\n and Omicron BA.2. (A) The number of characteristic mutations detected for each expected lineage; (B) Lineages detected by MixviR along with\n their estimated frequencies in comparison to expected values for the standards.", tag_levels = 'A')
+sars_plot_full
 
-ggplot2::ggsave(filename = "./Figure_2.tiff", dpi = 600)
-
+ggplot2::ggsave(filename = "../../AEM_revision/Figure_2.tiff", dpi = 300)
 ```
 
 
-# M. tuberculosis Validation
-
-## Generate VCF Files
-
-These are stored in dir "mtub_validation/vcfs/"
-
-### Download fastqs
-
-Data from SRA
-
-```{bash, eval = FALSE}
-#for each of "ERR221660, ERR221662, ERR221663, ERR221664, ERR221665, ERR221666"
-module load sratoolkit
-prefetch ${i}
-fastq-dump --split-files ${i}.sra
-```
-
-### Download M. tuberculosis Reference
-
-```{bash, eval = FALSE}
-mkdir ref
-curl -o ref/mtub.fa.gz https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/195/955/GCF_000195955.2_ASM19595v2/GCF_000195955.2_ASM19595v2_genomic.fna.gz
-cd ref
-gunzip mtub.fa.gz
-```
-
-### Align To Reference (Hisat2)
-
-```{bash, eval = FALSE}
-#build index
-module load hisat2
-hisat2-build mtub.fa mtub
-
-#for each "ERR221660, ERR221662, ERR221663, ERR221664, ERR221665, ERR221666"
-hisat2 -x ref/mtub -1 ${i}_1.fastq -2 ${i}_2.fastq -S ${i}.sam --un-conc-gz paired_unaligned_concord_${i}.fastq.gz --al-conc-gz paired_aligned_${i}.fastq.gz --summary-file summary_${i}.txt --rg-id ${i} --rg SM:${i}
-```
-
-### Mark PCR Duplicates
-
-```{bash, eval = FALSE}
-#for each of "ERR221660, ERR221662, ERR221663, ERR221664, ERR221665, ERR221666"
-samtools sort -@ 4 -o ${i}.sorted.bam ${i}.sam
-java -jar $PICARD MarkDuplicates I=${i}.sorted.bam O=picard_out/${i}.bam M=picard_out/metrics/${i}
-```
-
-### Variant Calling (GATK)
-```{bash, eval = FALSE}
-module load picard
-java -jar $PICARD CreateSequenceDictionary R=ref/mtub.fa O=ref/mtub.dict
-
-module load samtools
-cd ref
-samtools faidx mtub.fa
-cd ../
-
-#for each of "ERR221660, ERR221662, ERR221663, ERR221664, ERR221665, ERR221666"
-java -jar $PICARD BuildBamIndex I=picard_out/${i}.bam
-module load gatk/4.1.2.0
-gatk HaplotypeCaller -ploidy 2 -I picard_out/${i}.bam -R ref/mtub.fa -O ${i}.vcf
-gatk LeftAlignAndTrimVariants -V ${i}.vcf -R ref/mtub.fa --split-multi-allelics -O ${i}_split.vcf
-
-```
-
-## Create MixviR Bed File
-```{bash, eval = FALSE}
-cd ref
-curl -L -o mtub.gff.gz https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/195/955/GCF_000195955.2_ASM19595v2/GCF_000195955.2_ASM19595v2_genomic.gff.gz
-
-gunzip mtub.gff.gz
-
-grep -v -E "^#" mtub.gff > temp1.txt
-awk 'BEGIN {OFS="\t"} $3=="gene" {print $1,$4,$5,$6,$7,$9}' temp1.txt > genes.txt
-
-sed -E 's/(ID=.+Name=)(.+)(;experiment.+)/\2/' genes.txt > names.txt
-sed -E 's/(ID=.+Name=)(.+)(;gbkey.+)/\2/' names.txt > names2.txt
-
-awk 'BEGIN {OFS="\t"} {print $1,$2,$3,$6,$4,$5}' names2.txt > mixvir_mtub.bed
-
-```
-
-## Get Characteristic Mutations For Target Lineages
-Mutations associated with lineages designated "L1" and "L3" (corresponding to lineages EAI6-BGD1 and CAS1-Kili, respectively) were obtained from Table S3 of Merker et al (2020). These are available from "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/lineage_muts_Mtub_EAI_CAS.csv".
-
-## Clean Up Reference Chromosome Names
-
-```{bash, eval = FALSE}
-cd ref
-sed -E 's/[[:space:]].*$//' mtub.fa > mtub_clean.fa
-
-```
-## MixviR Analysis
+## M. tuberculosis - Full Dataset
 
 ### `call_mutations()`
+
 ```{r, eval = FALSE}
-
-# note this analysis is slow due to the size of the genome - ~5-10 min/sample.
-
-samp_muts <- call_mutations(sample.dir = "./mtub_validation/vcfs/", 
-               fasta.genome = "./mtub_validation/ref/mtub_clean.fa", 
-               bed = "./mtub_validation/ref/mixvir_mtub.bed",
+call_mutations(sample.dir = "dragen_runs/mtub/full/vcfs/",
+               fasta.genome = "ref/mtub_clean.fa", 
+               bed = "ref/mixvir_mtub.bed",
                genetic.code.num = "11",
                write.all.targets = TRUE, 
-               lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/lineage_muts_Mtub_EAI_CAS.csv",
+               lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv",
                write.mut.table = TRUE,
-               outfile.name = "mtub_validation/Mtub_samp_mutations.tsv")
-
+               outfile.name = "dragen_runs/mtub/full/Mtub_samp_mutations.tsv")
 ```
 
 ### `estimate_lineages()`
 
-```{r}
-lin.table <- estimate_lineages(lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/lineage_muts_Mtub_EAI_CAS.csv",
-                  outfile.name = "mtub_validation/estimated_proportions.csv",
-                  read.muts.from = "mtub_validation/Mtub_samp_mutations.tsv",
+```{r, results='hide'}
+estimate_lineages(read.muts.from = "dragen_runs/mtub/full/Mtub_samp_mutations.tsv",
+                  lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv",
+                  outfile.name = "dragen_runs/mtub/full/estimated_proportions.csv",
                   report.all = TRUE)
-
 ```
 
-## Generate Plots
+### Mutation Counts Plot
 
-### Target Mutation Proportions Plot (3A)
-
-```{r, warning=FALSE, message=FALSE}
-
-#combine results for number of mutations observed from "estimated_proportions.csv" with expected data in "Mtub_expected_target_mut_numbers.csv" 
-
-mtub_mut_num_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_expected_target_mut_numbers.csv")
-
-mtub_mut_num_observed <- readr::read_csv("./mtub_validation/estimated_proportions.csv") %>%
-  dplyr::rename("Value" = "Num_Target_Muts") %>%
-  dplyr::mutate("Targets" = "Detected") %>%
-  dplyr::select(Sample, Lineage, Targets, Value) %>%
-  dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L1 \\(EAI\\)", "EAI")) %>%
-  dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L3 \\(CAS\\)", "CAS")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "_split.vcf", ""))
-
-mtub_results_mut_num <- dplyr::bind_rows(mtub_mut_num_expected, mtub_mut_num_observed) %>%
-  dplyr::mutate("Targets" = factor(Targets, levels = c("Total", "Detected")))
-
-mtub_mut_prop_plot <- ggplot2::ggplot(mtub_results_mut_num, ggplot2::aes(x = Lineage, y = Value, fill = Targets)) +
-  ggplot2::geom_bar(stat = "identity", position = "dodge") +
-  ggplot2::scale_fill_brewer(palette = "Paired") +
-  ggplot2::facet_wrap(ggplot2::vars(Sample), scales = "free") +
-  ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
-  ggplot2::ggtitle("Target Mutations Identified From Mixtures of M. tuberculosis Lineages") +
-  ggplot2::labs(y = "Number Of Target Mutations",
-                title = "MixviR Validation: M. tuberculosis Mixtures",
-                subtitle = "Lineage-Characteristic Mutations Detected") + 
-  ggplot2::theme(legend.title = ggplot2::element_blank(),
-                 legend.text = ggplot2::element_text(size = 10),
-                 strip.text = ggplot2::element_text(size = 12),
-                 axis.text = ggplot2::element_text(size = 11),
-                 title = ggplot2::element_text(size = 15))
-
-ggplot2::ggsave(filename = "./Figure_3A.tiff", dpi = 600)
-
+```{r}
+mtub_mut_count_plot_full <- mut_count_plot(dataset = "mtub", coverage = "full", fig.num = "3A")
 ```
 
-### Lineage Proportions Plot (3B)
+### Lineage Proportions Plot
 
-```{r, warning=FALSE, message=FALSE}
-#combine results for estimates of lineage proportions observed from "estimated_proportions.csv" with expected data in "SarsCov2_expected_lineage_proportions.csv" 
-
-mtub_prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_expected_lineage_proportions.csv")
-
-mtub_prop_observed <- readr::read_csv("./mtub_validation/estimated_proportions.csv") %>%
-  dplyr::rename("Scaled Proportion Mean" = "Mean_Freq") %>%
-  dplyr::mutate("Type" = "MixviR Estimate") %>%
-  dplyr::select(Sample, Lineage, Type, `Scaled Proportion Mean`) %>%
-  dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L1 \\(EAI\\)", "EAI")) %>%
-  dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L3 \\(CAS\\)", "CAS")) %>%
-  dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "_split.vcf", ""))
-
-mtub_results_prop <- dplyr::bind_rows(mtub_prop_expected, mtub_prop_observed)
-
-mtub_lin_prop_plot <- ggplot2::ggplot(mtub_results_prop, ggplot2::aes(x = Type, y = `Scaled Proportion Mean`, fill = Lineage)) +
-  ggplot2::geom_bar(stat = "identity", position = "stack") +
-  ggplot2::scale_fill_brewer(palette = "Paired") +
-  ggplot2::facet_wrap(ggplot2::vars(Sample)) +
-  ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
-  ggplot2::labs(y = "Proportion In Sample",
-                title = "",
-                subtitle = "Estimates Of Lineage Proportions") +
-  ggplot2::theme(legend.title = ggplot2::element_blank(),
-                 legend.text = ggplot2::element_text(size = 10),
-                 strip.text = ggplot2::element_text(size = 12),
-                 axis.text = ggplot2::element_text(size = 11),
-                 title = ggplot2::element_text(size = 15)) +
-  ggplot2::scale_x_discrete(labels= c("Expected", "MixviR\nEstimate"))
-
-ggplot2::ggsave(filename = "./Figure_3B.tiff", dpi = 600)
+```{r}
+mtub_lin_prop_plot_full <- lin_prop_plot(dataset = "mtub", coverage = "full", fig.num = "3B")
 ```
 
 ### Combine M. tuberculosis Plots (Fig 3)
 
-```{r, fig.width=10}
-mtub_plot <- mtub_mut_prop_plot + mtub_lin_prop_plot
-mtub_plot
+```{r, fig.width=11}
+mtub_plot_full <- mtub_mut_count_plot_full + mtub_lin_prop_plot_full +
+  plot_annotation(tag_levels = 'A')
+  #plot_annotation(caption = expression(paste("Figure 3. ", italic("M. tuberculosis"), "validation analysis with six standards, each consisting of known mixtures of two ", italic("M. tuberculosis"), "lineages (CAS1-Kili and EAI6-BGD1).\n (A) The proportion of characteristic mutations detected for each expected lineage; (B) Lineages detected by MixviR along with their estimated\n frequencies in comparison to expected values for the standards."), tag_levels = 'A'))
+mtub_plot_full
 
-ggplot2::ggsave(filename = "./Figure_3.tiff", dpi = 600)
+ggplot2::ggsave(filename = "../../AEM_revision/Figure_3.tiff", dpi = 300)
 ```
 
-## Wastewater Example Plots (Fig 4)
 
-### Call Mutations
+# Wastewater Example Plots (Fig 4)
+
+## Call Mutations
 
 #note the infiles used here are in csv format instead of vcf
+#the csv input format is optional for MixviR, but was generally associated with earlier versions, and vcf is recommended for most runs. 
 #running the following code requires downloading the set of csv infiles available at "https://github.com/mikesovic/MixviR/tree/main/mixvir_paper/ww_infiles" and updating the *sample.dir* path in the call_mutations() function below to the directory containing the downloaded files.
 
 ```{r}
-ww_exp_muts <- MixviR::call_mutations(sample.dir = "ww_example/infiles", 
+ww_exp_muts <- call_mutations(sample.dir = "ww_example/infiles", 
                csv.infiles = TRUE, 
                name.sep = ".csv", 
                reference = "Wuhan")
 ```
 
 ### Lineage Present Plot (Fig 4A)
+
+The coded below is extracted and edited from the MixviR code that generates the Shiny dashboard.
+If you're running interactively, all of the remaining code in this section (down to the section titled 'Supplemental Analyses') can be replaced with the code in this code block...
+
+```{r, eval = FALSE}
+explore_mutations(muts.df = ww_exp_muts,
+                  dates = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/ww_example_location_date.csv",
+                  lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20220217.csv")
+```
+
 
 ```{r, fig.width = 10}
 depth.from.all.muts <- TRUE
@@ -514,12 +532,13 @@ pres_plot <- all_summary %>%
     ggplot2::ggtitle(paste0("Proportion of Lineage-Characteristic Mutations Present: ", "Site 1")) +
     ggplot2::scale_x_continuous(breaks = break_days, labels = break_dates) +
     ggplot2::theme(axis.title.x = ggplot2::element_blank(),
-                   axis.text.x = ggplot2::element_text(angle = 45, size = 10, vjust = 0.4),
-                   axis.text.y = ggplot2::element_text(size = 10),
-                   plot.title = ggplot2::element_text (color = "black", size= 13, face="bold"),
+                   axis.text.x = ggplot2::element_text(angle = 45, size = 8, vjust = 0.4),
+                   axis.text.y = ggplot2::element_text(size = 8),
+                   plot.title = ggplot2::element_text (color = "black", size= 11, face="bold"),
                    axis.title.y = ggplot2::element_blank(),
-                   legend.text = ggplot2::element_text(size = 11),
-                   legend.title = ggplot2::element_blank()) +
+                   legend.text = ggplot2::element_text(size = 8),
+                   legend.title = ggplot2::element_blank(),
+                   axis.title = ggplot2::element_text(size = 9)) +
     ggplot2::geom_hline(yintercept = 0.5, color = "red", linetype = 2, alpha = 0.6) +
     ggplot2::geom_point(data = all_summary, mapping = ggplot2::aes(x = days,
                                                                    y = `Proportion Present`,
@@ -528,10 +547,7 @@ pres_plot <- all_summary %>%
                                   high = "#132B43",
                                   limits = c(0,1000))
      
-
-pres_plot
-
-ggplot2::ggsave(filename = "./Figure_4A.tiff", dpi = 600)                            
+ggplot2::ggsave(filename = "./Figure_4A.tiff", plot = pres_plot, dpi = 300) 
 ```
 
 ### Frequency Plot (Fig 4B)
@@ -658,90 +674,602 @@ prop_plot <- all_summary %>%
               ggplot2::scale_x_continuous(breaks = break_days, labels = break_dates) +
               ggplot2::theme(axis.title.x = ggplot2::element_blank(),
                     axis.text.x = ggplot2::element_text(angle = 45, vjust = 0.4),
-                    axis.text = ggplot2::element_text(size = 10),
+                    axis.text = ggplot2::element_text(size = 8),
                     plot.title = ggplot2::element_text (color = "black", size= 11, face="bold"),
                     axis.title.y = ggplot2::element_blank(),
-                    legend.text = ggplot2::element_text(size = 11),
-                    legend.title = ggplot2::element_blank()) +
+                    legend.text = ggplot2::element_text(size = 8),
+                    legend.title = ggplot2::element_blank(),
+                    axis.title = ggplot2::element_text(size = 9)) +
               ggplot2::labs(y = paste0("Estimated Frequency (", measure, ")"))
 
-prop_plot
-
-ggplot2::ggsave(filename = "./Figure_4B.tiff", dpi = 600)  
+ggplot2::ggsave(filename = "./Figure_4B.tiff", plot = prop_plot, dpi = 300)  
 ```
 
 
-# Supplemental Analyses
+### Combine Wastewater Plots (Fig 4)
 
-## Regression Plot (Fig S1)
+```{r, fig.height=8, fig.width=12}
+ww_plot <- pres_plot / prop_plot +
+  plot_annotation(tag_levels = 'A')
+  #plot_annotation(caption = "Figure 4. MixviR results for samples collected over time at a wastewater treatment facility in Ohio, USA, and analyzed for SARS-CoV-2 lineages. The top panel is used\n to infer lineages present in the sample (points above the red dashed line marking the adjustable threshold for the proportion of lineage-characteristic\n mutations observed in the sample), and the estimated frequency of each identified lineage is plotted in the bottom panel. These plots represent one\n of several types of RShiny outputs available from MixviR for summarizing sample mutation data. Examples of all RShiny outputs are provided in Supplemental Figures S2-S6.", tag_levels = 'A')
+ww_plot
+
+ggplot2::ggsave(filename = "../../AEM_revision/Figure_4.tiff", plot = ww_plot, dpi = 300)
+```
+
+
+# Supplementary Material
+
+Supplementary analyses below.
+
+## Regression Analysis (Fig S1)
+
+### Functions
 
 ```{r}
-mtub_data <- mtub_results_prop %>%
-  dplyr::select(Sample, Lineage, Type, `Scaled Proportion Mean`) %>%
-  tidyr::pivot_wider(names_from = Type, values_from = `Scaled Proportion Mean`)
+reg_plot_input <- function(dataset, coverage) {
+  if (dataset == "SARS-CoV-2") {
+  prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/SarsCov2_expected_lineage_proportions.csv")
+ } else {
+  prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_expected_lineage_proportions.csv")
+}
+  
+ prop_expected <- prop_expected %>%
+   dplyr::rename("Sample Proportion" = "Scaled Proportion Mean")
+ 
+ prop_observed <- readr::read_csv(paste0("dragen_runs/", dataset, "/", coverage, "/estimated_proportions.csv"))
+ 
+ prop_observed <- prop_observed %>%
+    dplyr::filter(Proportion_Present >= 0.5)
+ 
+ prop_observed <- prop_observed %>%
+    dplyr::rename("Sample Proportion" = "Mean_Freq") %>%
+    dplyr::mutate("Type" = "MixviR Estimate") %>%
+    dplyr::select(Sample, Lineage, Type, `Sample Proportion`) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18936975.hard-filtered.vcf.gz", "Mixture 1")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18939817.hard-filtered.vcf.gz", "Mixture 2")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18961947.hard-filtered.vcf.gz", "Mixture 3")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18961847.hard-filtered.vcf.gz", "Mixture 4")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962157.hard-filtered.vcf.gz", "Mixture 5")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962947.hard-filtered.vcf.gz", "Mixture 6")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18962138.hard-filtered.vcf.gz", "Mixture 7")) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "Omicron_", "")) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L1 \\(EAI\\)", "EAI")) %>%
+    dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L3 \\(CAS\\)", "CAS")) %>%
+    dplyr::mutate("Sample" = stringr::str_replace_all(Sample, ".hard-filtered.vcf.gz", ""))
+    
+ results_prop <- dplyr::bind_rows(prop_expected, prop_observed)
 
-mtub_rsquared <- summary(lm(mtub_data$`MixviR Estimate`~mtub_data$Expected))[[9]]
+ results_prop
+}
+```
 
-lab_df <- data.frame("x" = c(0.3, 0.96), "y" = c(0.87, 0.02), "text" = c(paste("r^2 = ", round(mtub_rsquared, 3)), "B"))
+## Generate Plots
 
-mtub_plot <- mtub_data %>% ggplot2::ggplot(ggplot2::aes(x = Expected, y = `MixviR Estimate`, shape = Lineage)) +
-  ggplot2::geom_point(size = 2.5) +
-  ggplot2::geom_smooth(method = "lm", inherit.aes = FALSE, 
-              mapping = ggplot2::aes(x = Expected, y = `MixviR Estimate`), color = "black") +
-    ggplot2::theme_classic() +
-    ggplot2::labs(title = "", 
-        subtitle = "M. tuberculosis",
-         x = "Expected Proportion",
-        y = ggplot2::element_blank()) +
-    ggplot2::theme(legend.position = c(0.80, 0.16), 
-      legend.key.size = ggplot2::unit(0.5, 'cm'),
-      legend.text = ggplot2::element_text(size = 12),
-      strip.text = ggplot2::element_text(size = 12),
-      axis.text = ggplot2::element_text(size = 11),
-      title = ggplot2::element_text(size = 15)) +
-  ggplot2::coord_cartesian(xlim = c(0,1)) +
-  ggplot2::geom_label(data = lab_df %>% dplyr::slice(1), mapping = ggplot2::aes(x = x, y = y, label = text), inherit.aes = FALSE, size = 6) +
-  ggplot2::geom_text(data = lab_df %>% dplyr::slice(2), mapping = ggplot2::aes(x = x, y = y, label = text), inherit.aes = FALSE, size = 11)
+### SARS-CoV-2
 
-#Get Covid plot
+```{r}
+covid_results_prop <- reg_plot_input(dataset = "SARS-CoV-2", coverage = "full")
+
 sars_data <- covid_results_prop %>%
-  dplyr::select(Sample, Lineage, Type, `Scaled Proportion Mean`) %>%
-  tidyr::pivot_wider(names_from = Type, values_from = `Scaled Proportion Mean`)
+  dplyr::select(Sample, Lineage, Type, `Sample Proportion`) %>%
+  tidyr::pivot_wider(names_from = Type, values_from = `Sample Proportion`)
 
 sars_rsquared <- summary(lm(sars_data$`MixviR Estimate`~sars_data$Expected))[[9]]
 
-lab_df <- data.frame("x" = c(0.3, 0.96), "y" = c(0.9, 0.02), "text" = c(paste("r^2 = ", round(sars_rsquared, 3)), "A"))
+lab_df <- data.frame("x" = c(0.3, 0.96), "y" = c(0.9, 0.01), "text" = c(paste("r^2 = ", round(sars_rsquared, 3)), "A"))
 
 sars_plot <- sars_data %>% ggplot2::ggplot(ggplot2::aes(x = Expected, y = `MixviR Estimate`, shape = Lineage)) +
   ggplot2::geom_point(size = 2.5) +
   ggplot2::geom_smooth(method = "lm", inherit.aes = FALSE, 
-              mapping = ggplot2::aes(x = Expected, y = `MixviR Estimate`), color = "black") +
+                       mapping = ggplot2::aes(x = Expected, y = `MixviR Estimate`), color = "black") +
   ggplot2::theme_classic() +
-  ggplot2::labs(title = "Mixvir Estimates Of Lineage Frequencies In Mixed Samples",
-    subtitle = "SARS-CoV-2",
-    x = "Expected Proportion") +
+  ggplot2::labs(title = "MixviR Estimates Of Lineage Frequencies In Mixed Samples",
+                subtitle = "SARS-CoV-2",
+                x = "Expected Proportion") +
   ggplot2::theme(legend.position = c(0.80, 0.18), 
                  legend.key.size = ggplot2::unit(0.5, 'cm'),
                  legend.text = ggplot2::element_text(size = 12),
                  strip.text = ggplot2::element_text(size = 12),
                  axis.text = ggplot2::element_text(size = 11),
-                 title = ggplot2::element_text(size = 13.5)) +
+                 title = ggplot2::element_text(size = 11),
+                 axis.title = ggplot2::element_text(size = 11)) +
   ggplot2::coord_cartesian(ylim = c(0,1)) +
-  ggplot2::geom_label(data = lab_df %>% dplyr::slice(1), mapping = ggplot2::aes(x = x, y = y, label = text), inherit.aes = FALSE, size = 6) +
-  ggplot2::geom_text(data = lab_df %>% dplyr::slice(2), mapping = ggplot2::aes(x = x, y = y, label = text), inherit.aes = FALSE, size = 11)
-
-plotS1 <- sars_plot + mtub_plot
-plotS1
-
-ggplot2::ggsave(file = "./Figure_S1.tiff", dpi = 600)
+  ggplot2::geom_label(data = lab_df %>% dplyr::slice(1), mapping = ggplot2::aes(x = x, y = y, label = text), inherit.aes = FALSE, size = 5) +
+  ggplot2::geom_text(data = lab_df %>% dplyr::slice(2), mapping = ggplot2::aes(x = x, y = y, label = text), inherit.aes = FALSE, size = 6)
 ```
 
-## Shiny Examples (Figs S2-S5)
+### M. tuberculosis
+
+```{r}
+mtub_results_prop <- reg_plot_input(dataset = "mtub", coverage = "full")
+
+mtub_data <- mtub_results_prop %>%
+  dplyr::select(Sample, Lineage, Type, `Sample Proportion`) %>%
+  tidyr::pivot_wider(names_from = Type, values_from = `Sample Proportion`)
+
+mtub_rsquared <- summary(lm(mtub_data$`MixviR Estimate`~mtub_data$Expected))[[9]]
+
+lab_df <- data.frame("x" = c(0.3, 0.967), "y" = c(0.87, 0.05), "text" = c(paste("r^2 = ", round(mtub_rsquared, 3)), "B"))
+
+mtub_plot <- mtub_data %>% ggplot2::ggplot(ggplot2::aes(x = Expected, y = `MixviR Estimate`, shape = Lineage)) +
+  ggplot2::geom_point(size = 2.5) +
+  ggplot2::geom_smooth(method = "lm", inherit.aes = FALSE, 
+                       mapping = ggplot2::aes(x = Expected, y = `MixviR Estimate`), color = "black") +
+  ggplot2::theme_classic() +
+  ggplot2::labs(title = "", 
+                subtitle = expression(paste(italic("M. tuberculosis"))),
+                x = "Expected Proportion",
+                y = ggplot2::element_blank()) +
+  ggplot2::theme(legend.position = c(0.80, 0.16), 
+                 legend.key.size = ggplot2::unit(0.5, 'cm'),
+                 legend.text = ggplot2::element_text(size = 12),
+                 strip.text = ggplot2::element_text(size = 12),
+                 axis.text = ggplot2::element_text(size = 11),
+                 title = ggplot2::element_text(size = 11),
+                 axis.title = ggplot2::element_text(size = 11)) +
+  ggplot2::coord_cartesian(xlim = c(0,1)) +
+  ggplot2::geom_label(data = lab_df %>% dplyr::slice(1), mapping = ggplot2::aes(x = x, y = y, label = text), inherit.aes = FALSE, size = 5) +
+  ggplot2::geom_text(data = lab_df %>% dplyr::slice(2), mapping = ggplot2::aes(x = x, y = y, label = text), inherit.aes = FALSE, size = 6)
+
+```
+
+### Combine Plots
+
+```{r, fig.width=12}
+plotS1 <- sars_plot + mtub_plot
+plotS1
+ggplot2::ggsave(file = "../../AEM_revision/Figure_S1.tiff", dpi = 300)
+```
+
+
+
+# Subsampling Analyses
+
+Two samples from each dataset were selected to evaluate the effect of sequencing coverage on inferences by randomly subsampling reads from each of the corresponding fastq files to achieve depths of approximately 10x, 50x, and 100x, and reanalyzing each according to the methods described for analyses of the full datasets.
+
+## Randomize Fastqs
+
+Fastqs from SRA may be sorted by position, so need to randomize seqs first before subsetting with head. Doing this for two samples from each dataset. Obtained and used "fastq-shuffle.pl" script from https://github.com/chloroExtractorTeam/fastq-shuffle
+
+### SARS-CoV-2
+
+```{bash, eval = FALSE}
+perl fastq-shuffle.pl -r 3456 -1 covid/fastq/SRR18939817_1.fastq -2 covid/fastq/SRR18939817_2.fastq
+perl fastq-shuffle.pl -r 3456 -1 covid/fastq/SRR18961847_1.fastq -2 covid/fastq/SRR18961847_2.fastq
+```
+
+### M. tuberculosis
+
+```{bash, eval = FALSE}
+perl fastq-shuffle.pl -r 3456 -1 mtub/fastq/ERR221662_1.fastq -2 mtub/fastq/ERR221662_2.fastq
+perl fastq-shuffle.pl -r 3456 -1 mtub/fastq/ERR221664_1.fastq -2 mtub/fastq/ERR221664_2.fastq
+```
+
+## Subsample Fastqs
+
+Here, we randomly subsample two of the the original fastq files from each dataset to approximately 10x, 50x, and 100x coverage and reanalyze to evaluate the effects of the level of coverage on inferences.
+
+### SARS-CoV-2 10X
+
+```{bash, eval = FALSE}
+head -5980 covid/fastq/SRR18939817_1.fastq.shuffled > covid/10x/fastq/SRR18939817_1.fastq
+head -5980 covid/fastq/SRR18961847_2.fastq.shuffled > covid/10x/fastq/SRR18961847_2.fastq
+```
+
+### SARS-CoV-2 50X
+
+```{bash, eval = FALSE}
+head -29900 covid/fastq/SRR18939817_1.fastq.shuffled > covid/50x/fastq/SRR18939817_1.fastq
+head -29900 covid/fastq/SRR18961847_2.fastq.shuffled > covid/50x/fastq/SRR18961847_2.fastq
+```
+
+### SARS-CoV-2 100X
+
+```{bash, eval = FALSE}
+head -59804 covid/fastq/SRR18939817_1.fastq.shuffled > covid/100x/fastq/SRR18939817_1.fastq
+head -59804 covid/fastq/SRR18961847_2.fastq.shuffled > covid/100x/fastq/SRR18961847_2.fastq
+```
+
+### M. tuberculosis 10X
+
+```{bash, eval = FALSE}
+head -882304 mtub/fastq/ERR221662_1.fastq.shuffled > mtub/10x/fastq/ERR221662_1.fastq
+head -882304 mtub/fastq/ERR221664_2.fastq.shuffled > mtub/10x/fastq/ERR221664_2.fastq
+```
+
+### M. tuberculosis 50X
+
+```{bash, eval = FALSE}
+head -4411532 mtub/fastq/ERR221662_1.fastq.shuffled > mtub/50x/fastq/ERR221662_1.fastq
+head -4411532 mtub/fastq/ERR221664_2.fastq.shuffled > mtub/50x/fastq/ERR221664_2.fastq
+```
+
+### M. tuberculosis 100X
+
+```{bash, eval = FALSE}
+head -8823064 mtub/fastq/ERR221662_1.fastq.shuffled > mtub/100x/fastq/ERR221662_1.fastq
+head -8823064 mtub/fastq/ERR221664_2.fastq.shuffled > mtub/100x/fastq/ERR221664_2.fastq
+```
+
+## Analyze Subsampled Datasets
+
+Renamed each of the subsampled fastqs with custom script 'edit_fq_names.pl' to get them in proper format for Basespace and uploaded to Basespace. Further nalyses followed the workflows described for the full datasets. Specifically, ran the SARS-CoV-2 samples in the Covid Lineage app setting the Virus Primers BED file to V4 Artic and the callability and coverage thresholds to 1. Ran the *M. tuberculosis* samples in the DRAGEN Somatic app with Somatic Hotspots set to "None", Multi-allelic Filtering disabled, and the vc-enable-unequal-ntd-errors argument set to false. Resulting vcf files were downloaded to revisions/dragen_runs/...
+
+### Plotting Functions
+
+```{r}
+sub_mut_count_plot <- function(dataset, coverage, fig.num) { #coverage should be character vector of 1 or more coverage levels
+  
+  all_mut_count_results <- data.frame()
+  
+  for (i in coverage) {
+    mut_count_total <- readr::read_csv(paste0("dragen_runs/", dataset, "/", i, "/estimated_proportions.csv")) %>%
+      dplyr::select(Sample, Lineage, Num_Target_Muts) %>%
+      dplyr::mutate("Class" = "Total")
+    
+    mut_count_observed <- readr::read_csv(paste0("dragen_runs/", dataset, "/", i, "/estimated_proportions.csv")) %>%
+      dplyr::select(Sample, Lineage, Num_Target_Muts, Proportion_Present) %>%
+      dplyr::mutate("Class" = "Observed",
+                    "Num_Target_Muts" = Num_Target_Muts*Proportion_Present) %>%
+      dplyr::select(Sample, Lineage, Num_Target_Muts, Class)
+    
+    mut_count_results <- dplyr::bind_rows(mut_count_total, mut_count_observed) %>%
+      dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18939817.+", "Mixture 2")) %>%
+      dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18961847.+", "Mixture 4")) %>%
+      dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "Omicron_", "")) %>% 
+      dplyr::mutate("Class" = factor(Class, levels = c("Total", "Observed"))) %>%
+      dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L1 \\(EAI\\)", "EAI")) %>%
+      dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L3 \\(CAS\\)", "CAS")) %>%
+      dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "-.+hard-filtered.vcf.gz", "")) %>%
+      dplyr::mutate("Coverage" = i)
+    
+    all_mut_count_results <- dplyr::bind_rows(all_mut_count_results, mut_count_results)
+  }
+  
+  all_mut_count_results <- all_mut_count_results %>%
+    mutate("Coverage" = factor(Coverage, levels = c("10x", "50x", "100x")))
+  
+  if (dataset == "SARS-CoV-2") {
+    all_mut_count_results <- all_mut_count_results %>%
+      dplyr::filter((Sample == "Mixture 1" & Lineage %in% c("Alpha", "BA.1")) | 
+                      (Sample == "Mixture 2" & Lineage %in% c("BA.2", "Delta")) |
+                      (Sample == "Mixture 3" & Lineage %in% c("Alpha", "BA.2")) |
+                      (Sample == "Mixture 4" & Lineage %in% c("Alpha", "Delta")) |
+                      (Sample == "Mixture 5" & Lineage %in% c("Delta", "BA.1")) |
+                      (Sample == "Mixture 6" & Lineage %in% c("Alpha", "BA.2", "Delta")) |
+                      (Sample == "Mixture 7" & Lineage %in% c("Alpha", "BA.1", "BA.2", "Delta")))
+  }
+  
+  
+  if (dataset == "SARS-CoV-2") {
+    mut_count_plot1 <- ggplot2::ggplot(all_mut_count_results %>% dplyr::filter(Sample == "Mixture 2"), ggplot2::aes(x = Lineage, y = Num_Target_Muts, fill = Class)) +
+      ggplot2::geom_bar(stat = "identity", position = "dodge") +
+      ggplot2::scale_fill_brewer(palette = "Paired") +
+      ggplot2::facet_grid(rows = ggplot2::vars(Sample), cols = ggplot2::vars(Coverage), scales = "free") +
+      ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+      ggplot2::labs(y = "Number Of Target Mutations",
+                    title = paste0("Effect of Coverage Level: ", dataset, " Mixtures"),
+                    subtitle = "Lineage-Characteristic Mutations Detected") + 
+      ggplot2::theme(legend.direction = "horizontal", 
+                     legend.position = c(0.82, 1.193),
+                     legend.key.size = ggplot2::unit(0.4, 'cm'),
+                     legend.title = ggplot2::element_blank(),
+                     legend.text = ggplot2::element_text(size = 6),
+                     strip.text = ggplot2::element_text(size = 8),
+                     axis.text = ggplot2::element_text(size = 6),
+                     title = ggplot2::element_text(size = 8),
+                     axis.title = ggplot2::element_text(size = 7),
+                     plot.subtitle = ggplot2::element_text(size = 6.5, inherit = FALSE))
+    
+    mut_count_plot2 <- ggplot2::ggplot(all_mut_count_results %>% dplyr::filter(Sample == "Mixture 4"), ggplot2::aes(x = Lineage, y = Num_Target_Muts, fill = Class)) +
+      ggplot2::geom_bar(stat = "identity", position = "dodge") +
+      ggplot2::scale_fill_brewer(palette = "Paired") +
+      ggplot2::facet_grid(rows = ggplot2::vars(Sample), cols = ggplot2::vars(Coverage), scales = "free") +
+      ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+      ggplot2::labs(y = "Number Of Target Mutations") +
+      ggplot2::theme(legend.position = "none",
+                     strip.text = ggplot2::element_text(size = 8),
+                     axis.text = ggplot2::element_text(size = 6),
+                     axis.title = ggplot2::element_text(size = 7))
+    
+    mut_count_plot <- mut_count_plot1/mut_count_plot2
+  
+  } else {
+    
+    mut_count_plot1 <- ggplot2::ggplot(all_mut_count_results %>% dplyr::filter(Sample == "ERR221662"), ggplot2::aes(x = Lineage, y = Num_Target_Muts, fill = Class)) +
+      ggplot2::geom_bar(stat = "identity", position = "dodge") +
+      ggplot2::scale_fill_brewer(palette = "Paired") +
+      ggplot2::facet_grid(rows = ggplot2::vars(Sample), cols = ggplot2::vars(Coverage), scales = "free") +
+      ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+      #ggplot2::ggtitle("Target Mutations Identified From Mixtures of M. tuberculosis Lineages") +
+      ggplot2::labs(y = "Number Of Target Mutations",
+                    title = expression(paste("Effect of Coverage Level: ", italic("M. tuberculosis"), " Mixtures")),
+                    subtitle = "Lineage-Characteristic Mutations Detected") + 
+      ggplot2::theme(legend.direction = "horizontal", 
+                     legend.position = c(0.85, 1.193),
+                     legend.key.size = ggplot2::unit(0.4, 'cm'),
+                     legend.title = ggplot2::element_blank(),
+                     legend.text = ggplot2::element_text(size = 6),
+                     strip.text = ggplot2::element_text(size = 8),
+                     axis.text = ggplot2::element_text(size = 7),
+                     title = ggplot2::element_text(size = 8),
+                     axis.title = ggplot2::element_text(size = 7),
+                     plot.subtitle = ggplot2::element_text(size=6.5, inherit = FALSE)) +
+      scale_y_continuous(breaks = c(2,4,6,8,10), labels = c(2,4,6,8,10))
+    
+    mut_count_plot2 <- ggplot2::ggplot(all_mut_count_results %>% dplyr::filter(Sample == "ERR221664"), ggplot2::aes(x = Lineage, y = Num_Target_Muts, fill = Class)) +
+      ggplot2::geom_bar(stat = "identity", position = "dodge") +
+      ggplot2::scale_fill_brewer(palette = "Paired") +
+      ggplot2::facet_grid(rows = ggplot2::vars(Sample), cols = ggplot2::vars(Coverage), scales = "free") +
+      ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+      ggplot2::labs(y = "Number Of Target Mutations") +
+      ggplot2::theme(legend.position = "none",
+                     strip.text = ggplot2::element_text(size = 8),
+                     axis.text = ggplot2::element_text(size = 6),
+                     axis.title = ggplot2::element_text(size = 7)) +
+      scale_y_continuous(breaks = c(2,4,6,8,10), labels = c(2,4,6,8,10))
+    
+    mut_count_plot <- mut_count_plot1/mut_count_plot2
+    
+    
+  }
+  
+  ggplot2::ggsave(filename = paste0("dragen_runs/", dataset, "/", "/Figure_", fig.num, ".tiff"), 
+                  plot = mut_count_plot, 
+                  dpi = 300)
+  
+  mut_count_plot
+}
+
+
+
+sub_lin_prop_plot <- function(dataset, coverage, fig.num) {
+  
+  all_results_prop <- data.frame()
+  
+  if (dataset == "SARS-CoV-2") {
+    prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/SarsCov2_expected_lineage_proportions.csv")
+  } else {
+    prop_expected <- readr::read_csv("https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_expected_lineage_proportions.csv")
+  }
+  
+  prop_expected <- prop_expected %>%
+    dplyr::rename("Sample Proportion" = "Scaled Proportion Mean") %>%
+    dplyr::mutate("Coverage" = "Expected")
+  
+  for (i in coverage) {
+    prop_observed <- readr::read_csv(paste0("dragen_runs/", dataset, "/", i, "/estimated_proportions.csv"))
+    
+    prop_observed <- prop_observed %>%
+      dplyr::filter(Proportion_Present >= 0.5)
+    
+    prop_observed <- prop_observed %>%
+      dplyr::rename("Sample Proportion" = "Mean_Freq") %>%
+      dplyr::mutate("Type" = "MixviR Estimate") %>%
+      dplyr::select(Sample, Lineage, Type, `Sample Proportion`) %>%
+      dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18939817.+", "Mixture 2")) %>%
+      dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "SRR18961847.+", "Mixture 4")) %>%
+      dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "Omicron_", "")) %>%
+      dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L1 \\(EAI\\)", "EAI")) %>%
+      dplyr::mutate("Lineage" = stringr::str_replace_all(Lineage, "L3 \\(CAS\\)", "CAS")) %>%
+      dplyr::mutate("Sample" = stringr::str_replace_all(Sample, "-.+hard-filtered.vcf.gz", "")) %>%
+      dplyr::mutate("Coverage" = i)
+    
+    all_results_prop <- dplyr::bind_rows(all_results_prop, prop_observed)
+  } 
+  
+  all_results_prop <- dplyr::bind_rows(all_results_prop, prop_expected) %>%
+    mutate("Coverage" = factor(Coverage, levels = c("Expected", "10x", "50x", "100x")))
+  
+  if (dataset == "SARS-CoV-2") {
+    all_results_prop <- all_results_prop %>%
+      dplyr::filter((Sample == "Mixture 2" & Lineage %in% c("BA.2", "Delta")) | 
+                      (Sample == "Mixture 4" & Lineage %in% c("Alpha", "Delta")))
+  }
+  
+  if (dataset == "mtub") {
+    all_results_prop <- all_results_prop %>%
+      dplyr::filter(Sample == "ERR221662" | Sample == "ERR221664")
+  }
+  
+    lin_prop_plot <- ggplot2::ggplot(all_results_prop, ggplot2::aes(x = Coverage, y = `Sample Proportion`, fill = Lineage)) +
+      ggplot2::geom_bar(stat = "identity", position = "stack") +
+      ggplot2::scale_fill_brewer(palette = "Paired") +
+      ggplot2::facet_wrap(ggplot2::vars(Sample), ncol = 1) +
+      ggplot2::theme(axis.title.x = ggplot2::element_blank()) +
+      ggplot2::labs(y = "Proportion In Sample",
+                    title = "",
+                    subtitle = "Estimates Of Lineage Proportions") +
+      ggplot2::theme(legend.direction = "horizontal", 
+                     legend.position = c(0.75, 1.088),
+                     legend.key.size = ggplot2::unit(0.4, 'cm'),
+                     legend.title = ggplot2::element_blank(),
+                     legend.text = ggplot2::element_text(size = 6),
+                     strip.text = ggplot2::element_text(size = 8),
+                     axis.text = ggplot2::element_text(size = 6),
+                     title = ggplot2::element_text(size = 8),
+                     axis.title = ggplot2::element_text(size = 7),
+                     plot.subtitle = ggplot2::element_text(size=6.5, inherit = FALSE)) +
+      ggplot2::scale_x_discrete(labels= c("Expected", coverage))
+  
+  ggplot2::ggsave(filename = paste0("dragen_runs/", dataset, "/", i, "/Figure_", fig.num, ".tiff"), 
+                  plot = lin_prop_plot, 
+                  dpi = 300)
+  
+  lin_prop_plot
+}
+```
+
+## Run `call_mutations()` for each coverage level
+
+### SARS-CoV-2 10x
+
+```{r, eval = FALSE}
+call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/10x/vcfs/",
+                   reference = "Wuhan",
+                   write.mut.table = TRUE,
+                   outfile.name = "dragen_runs/SARS-CoV-2/10x/covid_samp_mutations.tsv")
+```
+
+### SARS-CoV-2 50x
+
+```{r, eval = FALSE}
+call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/50x/vcfs/",
+                   reference = "Wuhan",
+                   write.mut.table = TRUE,
+                   outfile.name = "dragen_runs/SARS-CoV-2/50x/covid_samp_mutations.tsv")
+```
+
+### SARS-CoV-2 100x
+
+```{r, eval = FALSE}
+call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/100x/vcfs/",
+                   reference = "Wuhan",
+                   write.mut.table = TRUE,
+                   outfile.name = "dragen_runs/SARS-CoV-2/100x/covid_samp_mutations.tsv")
+```
+
+### M. tuberculosis 10x
+
+```{r, eval = FALSE}
+# note this analysis is slow due to the size of the genome - ~5-10 min/sample.
+call_mutations(sample.dir = "dragen_runs/mtub/10x/vcfs/",
+               fasta.genome = "ref/mtub_clean.fa", 
+               bed = "ref/mixvir_mtub.bed",
+               genetic.code.num = "11",
+               write.all.targets = TRUE, 
+               lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv",
+               write.mut.table = TRUE,
+               outfile.name = "dragen_runs/mtub/10x/Mtub_samp_mutations.tsv")
+```
+
+### M. tuberculosis 50x
+
+```{r, eval = FALSE}
+# note this analysis is slow due to the size of the genome - ~5-10 min/sample.
+call_mutations(sample.dir = "dragen_runs/mtub/50x/vcfs/",
+               fasta.genome = "ref/mtub_clean.fa", 
+               bed = "ref/mixvir_mtub.bed",
+               genetic.code.num = "11",
+               write.all.targets = TRUE, 
+               lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv",
+               write.mut.table = TRUE,
+               outfile.name = "dragen_runs/mtub/50x/Mtub_samp_mutations.tsv")
+```
+
+### M. tuberculosis 100x
+
+```{r, eval = FALSE}
+# note this analysis is slow due to the size of the genome - ~5-10 min/sample.
+call_mutations(sample.dir = "dragen_runs/mtub/100x/vcfs/",
+               fasta.genome = "ref/mtub_clean.fa", 
+               bed = "ref/mixvir_mtub.bed",
+               genetic.code.num = "11",
+               write.all.targets = TRUE, 
+               lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv",
+               write.mut.table = TRUE,
+               outfile.name = "dragen_runs/mtub/100x/Mtub_samp_mutations.tsv")
+```
+
+## Run `estimate_lineages()` for each coverage level
+
+### SARS-CoV-2 10x
+
+```{r, results='hide'}
+estimate_lineages(read.muts.from = "dragen_runs/SARS-CoV-2/10x/covid_samp_mutations.tsv",
+                      lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20220217.csv",
+                  outfile.name = "dragen_runs/SARS-CoV-2/10x/estimated_proportions.csv",
+                  report.all = TRUE)
+```
+
+### SARS-CoV-2 50x
+
+```{r, results='hide'}
+estimate_lineages(read.muts.from = "dragen_runs/SARS-CoV-2/50x/covid_samp_mutations.tsv",
+                      lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20220217.csv",
+                  outfile.name = "dragen_runs/SARS-CoV-2/50x/estimated_proportions.csv",
+                  report.all = TRUE)
+```
+
+### SARS-CoV-2 100x
+
+```{r, results='hide'}
+estimate_lineages(read.muts.from = "dragen_runs/SARS-CoV-2/100x/covid_samp_mutations.tsv",
+                      lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20220217.csv",
+                  outfile.name = "dragen_runs/SARS-CoV-2/100x/estimated_proportions.csv",
+                  report.all = TRUE)
+```
+
+### M. tuberculosis 10x
+
+```{r, results='hide'}
+estimate_lineages(read.muts.from = "dragen_runs/mtub/10x/Mtub_samp_mutations.tsv",
+                  lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv",
+                  outfile.name = "dragen_runs/mtub/10x/estimated_proportions.csv",
+                  report.all = TRUE)
+```
+
+### M. tuberculosis 50x
+
+```{r, results='hide'}
+estimate_lineages(read.muts.from = "dragen_runs/mtub/50x/Mtub_samp_mutations.tsv",
+                  lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv",
+                  outfile.name = "dragen_runs/mtub/50x/estimated_proportions.csv",
+                  report.all = TRUE)
+```
+
+### M. tuberculosis 100x
+
+```{r, results='hide'}
+estimate_lineages(read.muts.from = "dragen_runs/mtub/100x/Mtub_samp_mutations.tsv",
+                  lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv",
+                  outfile.name = "dragen_runs/mtub/100x/estimated_proportions.csv",
+                  report.all = TRUE)
+```
+
+
+## Generate Plots For Subsampled Datasets
+
+### SARS-CoV-2
+
+```{r}
+sars_sub_mut_plot <- sub_mut_count_plot(dataset = "SARS-CoV-2", coverage = c("10x", "50x", "100x"), fig.num = "S2A")
+
+sars_sub_lin_plot <- sub_lin_prop_plot(dataset = "SARS-CoV-2", coverage = c("10x", "50x", "100x"), fig.num = "S2B")
+
+sars_sub_plot <- sars_sub_mut_plot | sars_sub_lin_plot
+
+sars_sub_plot
+
+ggplot2::ggsave(filename = "../../AEM_revision/Figure_S2.tiff", 
+                  plot = sars_sub_plot, 
+                  dpi = 300)
+```
+
+### M. tuberculosis
+
+```{r}
+mtub_sub_mut_plot <- sub_mut_count_plot(dataset = "mtub", coverage = c("10x", "50x", "100x"), fig.num = "S3A")
+
+mtub_sub_lin_plot <- sub_lin_prop_plot(dataset = "mtub", coverage = c("10x", "50x", "100x"), fig.num = "S3B")
+
+mtub_sub_plot <- mtub_sub_mut_plot | mtub_sub_lin_plot
+
+mtub_sub_plot
+
+ggplot2::ggsave(filename = "../../AEM_revision/Figure_S3.tiff", 
+                  plot = mtub_sub_plot, 
+                  dpi = 300)
+
+```
+
+## Shiny Examples (Figs S4-S7)
 
 Examples included were screenshots from tabs in Shiny dashboard.
 
 ```{r, eval = FALSE}
-if (interactive) {
+if (interactive()) {
 MixviR::explore_mutations(muts.df = ww_exp_muts,
                           dates = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/ww_example_location_date.csv",
                   lineage.muts = "https://raw.githubusercontent.com/mikesovic/MixviR/main/mutation_files/outbreak_20220217.csv")
