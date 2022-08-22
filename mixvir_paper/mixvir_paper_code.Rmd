@@ -12,9 +12,9 @@ knitr::opts_chunk$set(message = FALSE,
                       warning = FALSE)
 ```
 
-This document contains code associated with analyses in the paper describing MixviR (updated 8/11/22 in response to reviewer comments). The code is generalized, so paths to files will need to be updated to replicate analyses.  
+This document contains code associated with analyses in the paper describing *MixviR*. The code is generalized, so paths to files will need to be updated to replicate analyses.  
 
-The validation analyses involve two datasets - one with mixtures of SARS-CoV-2, and another with mixture samples from *M. tuberculosis*. Both datasets are available from NCBI's short read archive (SRA). fastq files were downloaded from SRA with the SRA Import app in Basespace. 
+The validation analyses involve two datasets - one with mixtures of SARS-CoV-2, and another with mixture samples from *M. tuberculosis*. Both datasets are available from NCBI's short read archive (SRA). Fastq files were downloaded from SRA with the SRA Import app in Basespace. 
 
 # Primary Manuscript Analyses
 
@@ -22,11 +22,11 @@ The validation analyses involve two datasets - one with mixtures of SARS-CoV-2, 
 
 ### SARS-CoV-2 
 
-Alignment and variant calling for the SARS-CoV-2 samples were performed with the DRAGEN Covid Lineage App v3.5.10 in Basespace using the primer bed file associated with Artic v4 primers and the callability and coverage thresholds to 1. Default settings were otherwise used. Resulting vcf files were obtained and used as input for MixviR analyses.
+Alignment and variant calling for the SARS-CoV-2 samples were performed with the DRAGEN Covid Lineage App v3.5.10 in Basespace using the primer bed file associated with Artic v4 primers and the callability and coverage thresholds to 1. Default settings were otherwise used. Resulting vcf files were obtained and used as input for *MixviR* analyses.
 
 ### M. tuberculosis
 
-Alignment and variant calling for the *M. tuberculosis* samples were performed with the DRAGEN Somatic App v4.0.3 in Basespace. Alignments were performed against the reference ??? after cleaning reference chromosome names for compatibility with MixviR. Variant calling was performed by turning off filtering of multiallelic variants, setting --vc-enable-unequal-ntd-errors to false, and setting Somatic Hotspots to 'None'. Resulting vcf files were obtained and used as input for MixviR analyses.
+Alignment and variant calling for the *M. tuberculosis* samples were performed with the DRAGEN Somatic App v4.0.3 in Basespace. Alignments were performed against the reference H37Rv (genome build ASM19595v2) after cleaning reference chromosome names for compatibility with *MixviR*. Variant calling was performed by turning off filtering of multiallelic variants, setting --vc-enable-unequal-ntd-errors to false, and setting Somatic Hotspots to 'None'. Resulting vcf files were obtained and used as input for *MixviR* analyses.
 
 ## Load R Packages
 
@@ -74,7 +74,7 @@ mtub_coverage <- mtub_coverage %>%
 mtub_coverage
 ```
 
-The full datasets have relatively high depths overall, with coverages for the SARS-CoV-2 dataset >5000x and the *M.tuberculosis* dataset in the range of ~150-200x.
+The full datasets have relatively high depths overall, with coverages for the SARS-CoV-2 dataset ~5000x and the *M.tuberculosis* dataset in the range of ~150-200x.
 
 ## Prep Additional Files for MixviR Validation Analyses
 
@@ -82,13 +82,13 @@ The full datasets have relatively high depths overall, with coverages for the SA
 
 #### Mutation File
 
-Mutation tables associated with SARS-CoV-2 lineages/variants were downloaded from outbreak.org on Feb 17, 2022 and combined into a "lineage.muts" file for MixviR. This file is available from https://github.com/mikesovic/MixviR/tree/main/mutation_files and also from https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/SarsCov2_lineage_muts.csv 
+Mutation tables associated with SARS-CoV-2 lineages/variants were downloaded from outbreak.org on Feb 17, 2022 and combined into a "lineage.muts" file for *MixviR*. This file is available from https://github.com/mikesovic/MixviR/tree/main/mutation_files and also from https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/SarsCov2_lineage_muts.csv 
 
 ### M. tuberculosis
 
 #### Mutation File
 
-Mutations associated with lineages designated "L1" and "L3" (corresponding to lineages EAI6-BGD1 and CAS1-Kili, respectively) were obtained from Table S3 of Merker et al (2020) to generate the "lineage.muts" file for MixviR. It is available from "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv".
+Mutations associated with lineages designated "L1" and "L3" (corresponding to lineages EAI6-BGD1 and CAS1-Kili, respectively) were obtained from Table S3 of Merker et al (2020) to generate the "lineage.muts" file for *MixviR*. It is available from "https://raw.githubusercontent.com/mikesovic/MixviR/main/mixvir_paper/Mtub_lineage_muts.csv".
 
 
 #### Prep bed File
@@ -288,7 +288,7 @@ lin_prop_plot <- function(dataset, coverage, fig.num) {
 
 ### `call_mutations()`
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/full/vcfs/",
                    reference = "Wuhan",
                    write.mut.table = TRUE,
@@ -320,9 +320,7 @@ sars_lin_prop_plot_full <- lin_prop_plot(dataset = "SARS-CoV-2", coverage = "ful
 
 ```{r, fig.width=11}
 sars_plot_full <- sars_mut_count_plot_full + plot_spacer() + sars_lin_prop_plot_full + 
-  plot_layout(widths = c(4.45, 0.1 ,4.45)) + 
-  plot_annotation(tag_levels = 'A')
-  #plot_annotation(caption = "Figure 2. SARS-CoV-2 validation analysis with seven standards, each consisting of known mixtures of two to four of the SARS-CoV-2 lineages Alpha, Delta, Omicron BA.1,\n and Omicron BA.2. (A) The number of characteristic mutations detected for each expected lineage; (B) Lineages detected by MixviR along with\n their estimated frequencies in comparison to expected values for the standards.", tag_levels = 'A')
+  plot_layout(widths = c(4.45, 0.1 ,4.45)) 
 sars_plot_full
 
 ggplot2::ggsave(filename = "../../AEM_revision/Figure_2.tiff", dpi = 300)
@@ -333,7 +331,7 @@ ggplot2::ggsave(filename = "../../AEM_revision/Figure_2.tiff", dpi = 300)
 
 ### `call_mutations()`
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 call_mutations(sample.dir = "dragen_runs/mtub/full/vcfs/",
                fasta.genome = "ref/mtub_clean.fa", 
                bed = "ref/mixvir_mtub.bed",
@@ -368,9 +366,7 @@ mtub_lin_prop_plot_full <- lin_prop_plot(dataset = "mtub", coverage = "full", fi
 ### Combine M. tuberculosis Plots (Fig 3)
 
 ```{r, fig.width=11}
-mtub_plot_full <- mtub_mut_count_plot_full + mtub_lin_prop_plot_full +
-  plot_annotation(tag_levels = 'A')
-  #plot_annotation(caption = expression(paste("Figure 3. ", italic("M. tuberculosis"), "validation analysis with six standards, each consisting of known mixtures of two ", italic("M. tuberculosis"), "lineages (CAS1-Kili and EAI6-BGD1).\n (A) The proportion of characteristic mutations detected for each expected lineage; (B) Lineages detected by MixviR along with their estimated\n frequencies in comparison to expected values for the standards."), tag_levels = 'A'))
+mtub_plot_full <- mtub_mut_count_plot_full + mtub_lin_prop_plot_full
 mtub_plot_full
 
 ggplot2::ggsave(filename = "../../AEM_revision/Figure_3.tiff", dpi = 300)
@@ -394,8 +390,8 @@ ww_exp_muts <- call_mutations(sample.dir = "ww_example/infiles",
 
 ### Lineage Present Plot (Fig 4A)
 
-The coded below is extracted and edited from the MixviR code that generates the Shiny dashboard.
-If you're running interactively, all of the remaining code in this section (down to the section titled 'Supplemental Analyses') can be replaced with the code in this code block...
+The code below is extracted and edited from the MixviR code that generates the Shiny dashboard.
+If running interactively, all of the remaining code in this section (down to the section titled 'Supplemental Material') can be replaced with the code in this code block...
 
 ```{r, eval = FALSE}
 explore_mutations(muts.df = ww_exp_muts,
@@ -689,18 +685,16 @@ ggplot2::ggsave(filename = "./Figure_4B.tiff", plot = prop_plot, dpi = 300)
 ### Combine Wastewater Plots (Fig 4)
 
 ```{r, fig.height=8, fig.width=12}
-ww_plot <- pres_plot / prop_plot +
-  plot_annotation(tag_levels = 'A')
-  #plot_annotation(caption = "Figure 4. MixviR results for samples collected over time at a wastewater treatment facility in Ohio, USA, and analyzed for SARS-CoV-2 lineages. The top panel is used\n to infer lineages present in the sample (points above the red dashed line marking the adjustable threshold for the proportion of lineage-characteristic\n mutations observed in the sample), and the estimated frequency of each identified lineage is plotted in the bottom panel. These plots represent one\n of several types of RShiny outputs available from MixviR for summarizing sample mutation data. Examples of all RShiny outputs are provided in Supplemental Figures S2-S6.", tag_levels = 'A')
+ww_plot <- pres_plot / prop_plot 
 ww_plot
 
 ggplot2::ggsave(filename = "../../AEM_revision/Figure_4.tiff", plot = ww_plot, dpi = 300)
 ```
 
 
-# Supplementary Material
+# Supplemental Material
 
-Supplementary analyses below.
+Supplemental analyses below.
 
 ## Regression Analysis (Fig S1)
 
@@ -894,7 +888,7 @@ head -8823064 mtub/fastq/ERR221664_2.fastq.shuffled > mtub/100x/fastq/ERR221664_
 
 ## Analyze Subsampled Datasets
 
-Renamed each of the subsampled fastqs with custom script 'edit_fq_names.pl' to get them in proper format for Basespace and uploaded to Basespace. Further nalyses followed the workflows described for the full datasets. Specifically, ran the SARS-CoV-2 samples in the Covid Lineage app setting the Virus Primers BED file to V4 Artic and the callability and coverage thresholds to 1. Ran the *M. tuberculosis* samples in the DRAGEN Somatic app with Somatic Hotspots set to "None", Multi-allelic Filtering disabled, and the vc-enable-unequal-ntd-errors argument set to false. Resulting vcf files were downloaded to revisions/dragen_runs/...
+Renamed each of the subsampled fastqs with custom script 'edit_fq_names.pl' to get them in proper format for Basespace and uploaded to Basespace. Further analyses followed the workflows described for the full datasets. Specifically, ran the SARS-CoV-2 samples in the Covid Lineage app setting the Virus Primers BED file to V4 Artic and the callability and coverage thresholds to 1. Ran the *M. tuberculosis* samples in the DRAGEN Somatic app with Somatic Hotspots set to "None", Multi-allelic Filtering disabled, and the vc-enable-unequal-ntd-errors argument set to false. Resulting vcf files were downloaded to revisions/dragen_runs/...
 
 ### Plotting Functions
 
@@ -1105,7 +1099,7 @@ sub_lin_prop_plot <- function(dataset, coverage, fig.num) {
 
 ### SARS-CoV-2 10x
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/10x/vcfs/",
                    reference = "Wuhan",
                    write.mut.table = TRUE,
@@ -1114,7 +1108,7 @@ call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/10x/vcfs/",
 
 ### SARS-CoV-2 50x
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/50x/vcfs/",
                    reference = "Wuhan",
                    write.mut.table = TRUE,
@@ -1123,7 +1117,7 @@ call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/50x/vcfs/",
 
 ### SARS-CoV-2 100x
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/100x/vcfs/",
                    reference = "Wuhan",
                    write.mut.table = TRUE,
@@ -1132,7 +1126,7 @@ call_mutations(sample.dir = "dragen_runs/SARS-CoV-2/100x/vcfs/",
 
 ### M. tuberculosis 10x
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 # note this analysis is slow due to the size of the genome - ~5-10 min/sample.
 call_mutations(sample.dir = "dragen_runs/mtub/10x/vcfs/",
                fasta.genome = "ref/mtub_clean.fa", 
@@ -1146,7 +1140,7 @@ call_mutations(sample.dir = "dragen_runs/mtub/10x/vcfs/",
 
 ### M. tuberculosis 50x
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 # note this analysis is slow due to the size of the genome - ~5-10 min/sample.
 call_mutations(sample.dir = "dragen_runs/mtub/50x/vcfs/",
                fasta.genome = "ref/mtub_clean.fa", 
@@ -1160,7 +1154,7 @@ call_mutations(sample.dir = "dragen_runs/mtub/50x/vcfs/",
 
 ### M. tuberculosis 100x
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 # note this analysis is slow due to the size of the genome - ~5-10 min/sample.
 call_mutations(sample.dir = "dragen_runs/mtub/100x/vcfs/",
                fasta.genome = "ref/mtub_clean.fa", 
@@ -1264,7 +1258,7 @@ ggplot2::ggsave(filename = "../../AEM_revision/Figure_S3.tiff",
 
 ```
 
-## Shiny Examples (Figs S4-S7)
+## Shiny Examples (Figs S4-S8)
 
 Examples included were screenshots from tabs in Shiny dashboard.
 
