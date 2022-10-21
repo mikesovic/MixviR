@@ -16,7 +16,7 @@ call_mutations(
   genetic.code.num = "1",
   out.cols = c("SAMP_NAME", "CHR", "POS", "GENE", "ALT_ID", "AF", "DP"),
   write.mut.table = FALSE,
-  outfile.name = "sample_mutations.tsv",
+  outfile.name = "sample_mutations.csv",
   indel.format = "Fwd",
   csv.infiles = FALSE
 )
@@ -42,16 +42,16 @@ call_mutations(
 
 \item{out.cols}{Character vector with names of columns to be returned. Choose from: CHR, POS, REF_BASE, GENE, STRAND, REF_CODON, REF_AA, GENE_AA_POS, REF_IDENT, REF, ALT, AF, ALT_COUNT, SAMP_CODON, SAMP_AA, ALT_ID, DP, SAMP_NAME, TYPE. The default columns SAMP_NAME, CHR, POS, ALT_ID, AF, DP must be included to run explore_mutations().}
 
-\item{write.mut.table}{Logical indicating whether to write the 'samp_mutations' data frame (see "Value" below) to a text file (tsv). Default = FALSE. See \emph{outfile.name}.}
+\item{write.mut.table}{Logical indicating whether to write the 'samp_mutations' data frame (see "Value" below) to a text file (csv). Default = FALSE. See \emph{outfile.name}.}
 
-\item{outfile.name}{Path to file where (tsv) output will be written if \emph{write.mut.table} is TRUE. Default: "sample_mutations.tsv" (written to working directory)}
+\item{outfile.name}{Path to file where (csv) output will be written if \emph{write.mut.table} is TRUE. Default: "sample_mutations.csv" (written to working directory)}
 
 \item{indel.format}{Defines the naming convention for indels. Default is "Fwd", meaning the name would look like S_del144/144. "Rev" switches this to S_144/144del.}
 
 \item{csv.infiles}{Logical to indicate whether files in \emph{sample.dir} directory are in vcf or csv format. All files must be of the same format. If csv, they must contain columns named: "CHR"    "POS"    "REF"    "ALT"    "DP"    "ALT_COUNT". See the `batch_vcf_to_mixvir()`` function to convert vcfs to csv format). Default is FALSE (input is in vcf format). This exists primarily for legacy reasons.}
 }
 \value{
-A data frame containing variants observed for each sample, positions of the underlying mutations, and other (customizable) information. This data frame can be saved as an object in the global environment and/or written to a file (tsv - see \emph{write.mut.table}), and in either case serves as input for the \emph{MixviR} functions \code{explore_mutations()} and \code{estimate_lineages()}.
+A data frame containing variants observed for each sample, positions of the underlying mutations, and other (customizable) information. This data frame can be saved as an object in the global environment and/or written to a file (see \emph{write.mut.table}), and in either case serves as input for the \emph{MixviR} functions \code{explore_mutations()} and \code{estimate_lineages()}.
 }
 \description{
 Identify full set of amino acid/SNP/indel changes from one or more samples (includes changes based on both SNVs and indels). This is generally the first function run in a MixviR analysis.
