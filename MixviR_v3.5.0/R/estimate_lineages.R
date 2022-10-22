@@ -525,7 +525,7 @@ estimate_lineages <- function(muts.df,
     
     if(nrow(sub_lineage_muts) > 0) { 
       
-      get_sub_props <- function(sampname, dat, lin) {
+      get_sub_props_date <- function(sampname, dat, lin) {
         samp_data_sub <- samp_data %>%
           dplyr::filter(SAMP_NAME %in% sampname & date %in% dat)
         
@@ -549,7 +549,7 @@ estimate_lineages <- function(muts.df,
         char_sub_summary
       } 
       
-      get_sublins <- function(sampname, dat, lin) {
+      get_sublins_date <- function(sampname, dat, lin) {
         samp_data_sub <- samp_data %>%
           dplyr::filter(SAMP_NAME %in% sampname & date %in% dat)
         
@@ -573,7 +573,7 @@ estimate_lineages <- function(muts.df,
         char_sub_summary
       } 
       
-      get_sub_freqs <- function(sampname, dat, lin) {
+      get_sub_freqs_date <- function(sampname, dat, lin) {
         
         samp_data_sub <- samp_data %>%
           dplyr::filter(SAMP_NAME %in% sampname & date %in% dat)
@@ -634,7 +634,7 @@ estimate_lineages <- function(muts.df,
         char_sub_summary
       }
       
-      get_sub_muts <- function(sampname, dat, lin) {
+      get_sub_muts_date <- function(sampname, dat, lin) {
         samp_data_sub <- samp_data %>%
           dplyr::filter(SAMP_NAME %in% sampname & date %in% dat)
         
@@ -663,10 +663,10 @@ estimate_lineages <- function(muts.df,
       
       all_summary <- all_summary %>%
         dplyr::rowwise() %>%
-        dplyr::mutate("Sublineages_Identified" = get_sublins(sampname = Sample, dat = Date, lin = Lineage),
-                      "Sub_Proportion_Targets_Present" = get_sub_props(sampname = Sample, dat = Date, lin = Lineage),
-                      "Sub_Estimated_Freq" = get_sub_freqs(sampname = Sample, dat = Date, lin = Lineage),
-                      "Sub_Target_Muts_Present" = get_sub_muts(sampname = Sample, dat = Date, lin = Lineage)) %>%
+        dplyr::mutate("Sublineages_Identified" = get_sublins_date(sampname = Sample, dat = Date, lin = Lineage),
+                      "Sub_Proportion_Targets_Present" = get_sub_props_date(sampname = Sample, dat = Date, lin = Lineage),
+                      "Sub_Estimated_Freq" = get_sub_freqs_date(sampname = Sample, dat = Date, lin = Lineage),
+                      "Sub_Target_Muts_Present" = get_sub_muts_date(sampname = Sample, dat = Date, lin = Lineage)) %>%
         dplyr::ungroup()
       
     }
