@@ -5,13 +5,14 @@ was originally developed to analyze SARS-CoV-2 environmental (wastewater) sample
 
 ## Installation
 
+### CRAN
+
+*MixviR* is available from CRAN and can be installed from within R with...
+install.packages("MixviR")
+
 ### GitHub
 devtools::install_github("mikesovic/MixviR/MixviR_X.Y.Z")
 
-### CRAN
-
-*MixviR* was recently submitted to CRAN. Once available there, it will be able to be installed with...
-install.packages("MixviR")
 
 ## Usage
 
